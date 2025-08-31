@@ -4,36 +4,39 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type { CartItem, MenuItem, Order } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
-import { completeOrder as completeOrderInDB } from '@/ai/flows/order-flow';
 import axios from 'axios';
 
 interface OrderContextType {
   cart: CartItem[];
-  myOrderTokens: string[];
+  myOrders: Order[];
   kitchenOrders: Order[];
-  loading: boolean;
+  loading: boolean; // For kitchen orders
+  myOrdersLoading: boolean; // For my orders
   error: string | null;
+  fetchMyOrders: (phone: string) => Promise<void>;
   setKitchenOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   addToCart: (item: MenuItem) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  addMyOrderToken: (token: string) => void;
   completeOrder: (id: string) => Promise<boolean>; 
   cartTotal: number;
   cartCount: number;
+  inProgressOrderCount: number;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const MY_ORDERS_KEY = 'myOrderTokens';
+const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [myOrderTokens, setMyOrderTokens] = useState<string[]>([]);
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [kitchenOrders, setKitchenOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [myOrdersLoading, setMyOrdersLoading] = useState(false);
+
 
   const fetchKitchenOrders = useCallback(async () => {
     try {
@@ -45,7 +48,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       const backendOrders = res.data.orders || [];
 
       const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
-        id: order._id, // Capture the main document ID
+        id: order._id,
         token: order.orderToken,
         customerName: order.customer.name,
         customerPhone: order.customer.phone,
@@ -68,36 +71,46 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }
   }, []);
-
+  
+  const fetchMyOrders = useCallback(async (phone: string) => {
+    if (!phone || phone.length !== 10) return;
+    setMyOrdersLoading(true);
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phone}`
+      );
+      const backendOrders = res.data.orders || [];
+      const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
+        token: order.orderToken,
+        id: order._id,
+        customerName: order.customer.name,
+        customerPhone: order.customer.phone,
+        total: order.amount,
+        status: order.status,
+        timestamp: new Date(order.createdAt).getTime(),
+        items: order.lineItems.map((item: any) => ({
+          id: item._id,
+          name: item.sku,
+          quantity: item.qty,
+          price: item.price,
+        })),
+      }));
+      setMyOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
+    } catch (err) {
+      console.error('Error fetching my orders:', err);
+      // We don't set a general error here not to disrupt other parts of the UI
+    } finally {
+      setMyOrdersLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    try {
-      const storedTokens = localStorage.getItem(MY_ORDERS_KEY);
-      if (storedTokens) {
-        setMyOrderTokens(JSON.parse(storedTokens));
-      }
-    } catch (error) {
-        console.error("Could not read from localStorage", error)
-    }
-
     fetchKitchenOrders();
-
-  }, [fetchKitchenOrders]);
-
-  const addMyOrderToken = useCallback((token: string) => {
-    setMyOrderTokens((prevTokens) => {
-      if (prevTokens.includes(token)) {
-        return prevTokens;
-      }
-      const newTokens = [...prevTokens, token];
-      try {
-        localStorage.setItem(MY_ORDERS_KEY, JSON.stringify(newTokens));
-      } catch (error) {
-        console.error("Could not write to localStorage", error);
-      }
-      return newTokens;
-    });
-  }, []);
+    const cachedPhone = localStorage.getItem(CUSTOMER_PHONE_KEY);
+    if (cachedPhone) {
+        fetchMyOrders(cachedPhone);
+    }
+  }, [fetchKitchenOrders, fetchMyOrders]);
 
 
   const addToCart = (item: MenuItem) => {
@@ -132,15 +145,27 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
 
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
+  const inProgressOrderCount = myOrders.filter(order => order.status !== 'done').length;
 
   const completeOrder = async (id: string): Promise<boolean> => {
     try {
-        const result = await completeOrderInDB(id);
-        if (result.success) {
-          toast({
-              title: "Order Completed!",
-              description: `Order has been marked as complete.`
-          });
+        const res = await axios.patch(
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`, 
+            { status: 'done' }
+        );
+
+        if (res.status === 200) {
+          setKitchenOrders(prevOrders => 
+            prevOrders.map(order => 
+              order.id === id ? { ...order, status: 'done' } : order
+            ).sort((a, b) => b.timestamp - a.timestamp)
+          );
+          // Also refresh myOrders if the completed order is in that list
+          setMyOrders(prevOrders =>
+            prevOrders.map(order =>
+              order.id === id ? { ...order, status: 'done' } : order
+            )
+          );
           return true;
         } else {
            throw new Error("Backend update failed");
@@ -160,19 +185,21 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     <OrderContext.Provider
       value={{
         cart,
-        myOrderTokens,
+        myOrders,
         kitchenOrders,
         loading,
+        myOrdersLoading,
         error,
         setKitchenOrders,
+        fetchMyOrders,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
-        addMyOrderToken,
         completeOrder,
         cartTotal,
         cartCount,
+        inProgressOrderCount,
       }}
     >
       {children}

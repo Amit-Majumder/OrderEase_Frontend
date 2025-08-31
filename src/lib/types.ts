@@ -31,5 +31,5 @@ export interface Order {
   customerPhone: string; // mapped from 'customer.phone'
   total: number; // mapped from 'amount'
   timestamp: number; // mapped from 'createdAt'
-  status: 'new' | 'completed' | 'paid'; // mapped from 'status'
+  status: 'new' | 'paid' | 'done'; // mapped from 'status'
 }

@@ -29,32 +29,39 @@ export function OrderCard({ order, onOrderCompleted }: OrderCardProps) {
   const time = new Date(order.timestamp).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   });
 
   const handleComplete = async () => {
     setIsCompleting(true);
     const success = await completeOrder(order.id);
+    // The onOrderCompleted prop is kept for potential future use,
+    // but the primary state update is now handled in the context.
     if (success) {
-      onOrderCompleted(order.id); // Notify parent component to update UI
+      onOrderCompleted(order.id);
     }
-    setIsCompleting(false);
+    // Don't set isCompleting to false if successful,
+    // as the card will change state and the button will disappear.
+    if (!success) {
+        setIsCompleting(false);
+    }
   }
 
   const phoneNumber10Digits = order.customerPhone.slice(-10);
-
+  const isCompleted = order.status === 'done';
 
   return (
     <Card
       className={cn(
         'flex flex-col transition-all',
-        order.status === 'completed' ? 'bg-muted/50 border-dashed' : 'bg-card'
+        isCompleted ? 'bg-muted/50 border-dashed' : 'bg-card'
       )}
     >
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
                  <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                    {order.status === 'completed' ? (
+                    {isCompleted ? (
                         <CheckCircle className="text-accent" />
                     ) : (
                         <CircleDashed className="text-primary animate-spin" />
@@ -94,7 +101,7 @@ export function OrderCard({ order, onOrderCompleted }: OrderCardProps) {
             {isCompleting ? 'Completing...' : 'Mark as Complete'}
           </Button>
         )}
-        {order.status === 'completed' && (
+        {isCompleted && (
            <p className="w-full text-center text-sm text-muted-foreground">Order fulfilled.</p>
         )}
       </CardFooter>

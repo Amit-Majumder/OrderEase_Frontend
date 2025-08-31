@@ -6,7 +6,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -21,36 +20,32 @@ import {
 import { useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import type { Order } from '@/lib/types';
-import axios from 'axios';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSearchParams } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import { useOrder } from '@/context/OrderContext';
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 
 function MyOrderCard({ order }: { order: Order }) {
-  const isCompleted = order.status === 'completed';
+  const isCompleted = order.status === 'done';
   const time = new Date(order.timestamp).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   });
 
   return (
-    <Card
-      className={cn(
-        'transition-all shadow-md bg-card',
-        isCompleted && 'border-dashed'
-      )}
-    >
+    <Card className={'transition-all shadow-md bg-card'}>
       <CardHeader className="p-4">
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-3 font-headline text-xl">
-             {isCompleted ? (
-                <CheckCircle className="h-6 w-6 text-accent" />
-              ) : (
-                <CircleDashed className="h-6 w-6 text-primary animate-spin" />
-              )}
+            {isCompleted ? (
+              <CheckCircle className="h-6 w-6 text-accent" />
+            ) : (
+              <CircleDashed className="h-6 w-6 text-primary animate-spin" />
+            )}
             <span>Order #{order.token}</span>
           </CardTitle>
           <div className="text-right">
@@ -62,7 +57,9 @@ function MyOrderCard({ order }: { order: Order }) {
             >
               {isCompleted ? 'Completed' : 'In Progress'}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Placed at {time}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Placed at {time}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -89,10 +86,9 @@ function MyOrderCard({ order }: { order: Order }) {
 
 export default function MyOrdersPage() {
   const searchParams = useSearchParams();
+  const { myOrders, fetchMyOrders, myOrdersLoading } = useOrder();
   
   const [phone, setPhone] = useState('');
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
 
@@ -103,53 +99,16 @@ export default function MyOrdersPage() {
     }
   };
 
-  const handleFindOrders = useCallback(async (phoneNumber: string) => {
-    if (!phoneNumber || phoneNumber.length !== 10) {
+  const handleFindOrders = useCallback(async () => {
+    setError(null);
+    if (!phone || phone.length !== 10) {
       setError('Please enter a valid 10-digit phone number.');
-      setLoading(false);
       return;
     }
-    try {
-      setLoading(true);
-      setError(null);
-      setSearched(true);
-      setOrders([]);
-
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phoneNumber}`
-      );
-
-      const backendOrders = res.data.orders || [];
-
-      const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
-        token: order.orderToken,
-        id: order._id,
-        customerName: order.customer.name,
-        customerPhone: order.customer.phone,
-        total: order.amount,
-        status: order.status,
-        timestamp: new Date(order.createdAt).getTime(),
-        items: order.lineItems.map((item: any) => ({
-          id: item._id,
-          name: item.sku,
-          quantity: item.qty,
-          price: item.price,
-        })),
-      }));
-
-      setOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
-      
-      // On successful search, save the phone number to cache
-      localStorage.setItem(CUSTOMER_PHONE_KEY, phoneNumber);
-
-    } catch (err) {
-      console.error('Error fetching orders by phone:', err);
-      setError('Could not fetch orders. Please check the phone number or try again later.');
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setSearched(true);
+    await fetchMyOrders(phone);
+    localStorage.setItem(CUSTOMER_PHONE_KEY, phone);
+  }, [phone, fetchMyOrders]);
 
   useEffect(() => {
     const phoneFromUrl = searchParams.get('phone');
@@ -158,10 +117,12 @@ export default function MyOrdersPage() {
 
     if(initialPhone){
         setPhone(initialPhone);
-        setLoading(true); // Set loading to true since we'll auto-fetch
-        handleFindOrders(initialPhone);
+        if(!searched) {
+          setSearched(true);
+          fetchMyOrders(initialPhone);
+        }
     }
-  }, [searchParams, handleFindOrders]);
+  }, [searchParams, fetchMyOrders, searched]);
 
 
   return (
@@ -189,8 +150,8 @@ export default function MyOrdersPage() {
                     placeholder="10-digit mobile number"
                  />
             </div>
-            <Button onClick={() => handleFindOrders(phone)} disabled={loading} className="w-full sm:w-auto">
-              {loading ? (
+            <Button onClick={handleFindOrders} disabled={myOrdersLoading} className="w-full sm:w-auto">
+              {myOrdersLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Search className="mr-2 h-4 w-4" />
@@ -204,15 +165,15 @@ export default function MyOrdersPage() {
 
 
         <div className="max-w-2xl mx-auto mt-12 space-y-6">
-          {loading && !searched && (
+          {myOrdersLoading && (
             <div className="flex justify-center items-center py-16">
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
               <p className="ml-4 text-muted-foreground">Searching for your orders...</p>
             </div>
           )}
           
-          {!loading && searched && orders.length > 0 && (
-             orders.map(order => (
+          {!myOrdersLoading && searched && myOrders.length > 0 && (
+             myOrders.map(order => (
               <MyOrderCard 
                 key={order.id} 
                 order={order} 
@@ -220,7 +181,7 @@ export default function MyOrdersPage() {
             ))
           )}
 
-          {!loading && searched && orders.length === 0 && !error &&(
+          {!myOrdersLoading && searched && myOrders.length === 0 && !error &&(
              <div className="text-center py-16 bg-background rounded-lg border-2 border-dashed flex flex-col items-center justify-center">
               <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No orders found for this phone number.</p>

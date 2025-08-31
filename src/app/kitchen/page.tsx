@@ -4,23 +4,20 @@
 import { OrderCard } from '@/components/OrderCard';
 import { ChefHat, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { useEffect, useState, useCallback } from 'react';
 import type { Order } from '@/lib/types';
-import axios from 'axios';
 import { useOrder } from '@/context/OrderContext';
 
 export default function KitchenPage() {
   const { kitchenOrders, setKitchenOrders, loading, error } = useOrder();
 
   const handleOrderCompletion = (orderId: string) => {
-    const updatedOrders = kitchenOrders.map(order => 
-      order.id === orderId ? { ...order, status: 'completed' } : order
-    );
-    setKitchenOrders(updatedOrders);
+    // The logic is now handled optimistically in the context,
+    // but we still pass this down to the card.
+    // The context will update the `kitchenOrders` state, causing a re-render.
   };
   
   const newOrders = kitchenOrders.filter((order) => order.status === 'paid');
-  const completedOrders = kitchenOrders.filter((order) => order.status === 'completed');
+  const completedOrders = kitchenOrders.filter((order) => order.status === 'done');
 
   if (loading) {
     return (

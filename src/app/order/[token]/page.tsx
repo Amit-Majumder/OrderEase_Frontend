@@ -23,7 +23,7 @@ const CUSTOMER_NAME_KEY = 'customerName';
 
 export default function OrderSuccessPage() {
   const { token: uniqueId } = useParams(); // This is the unique ID from the URL
-  const { addMyOrderToken } = useOrder();
+  const { fetchMyOrders } = useOrder();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,13 +63,13 @@ export default function OrderSuccessPage() {
           };
 
           setOrder(fetchedOrder);
-          addMyOrderToken(fetchedOrder.token);
           
-          // Save customer details to localStorage
           try {
             const phoneNumber10Digits = fetchedOrder.customerPhone.slice(-10);
             localStorage.setItem(CUSTOMER_PHONE_KEY, phoneNumber10Digits);
             localStorage.setItem(CUSTOMER_NAME_KEY, fetchedOrder.customerName);
+            // After successful order, trigger a fetch of my orders
+            fetchMyOrders(phoneNumber10Digits);
           } catch(e) {
             console.error("Could not write to localStorage", e);
           }
@@ -87,7 +87,7 @@ export default function OrderSuccessPage() {
     }
 
     fetchOrderDetails();
-  }, [uniqueId, addMyOrderToken]);
+  }, [uniqueId, fetchMyOrders]);
 
   if (loading) {
     return (
