@@ -17,7 +17,7 @@ import {
   CircleDashed,
   Search,
 } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import type { Order } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,7 @@ function MyOrderCard({ order }: { order: Order }) {
             {isCompleted ? (
               <CheckCircle className="h-6 w-6 text-accent" />
             ) : (
-              <CircleDashed className="h-6 w-6 text-primary animate-spin" />
+              <CircleDashed className="h-6 w-6 text-primary" />
             )}
             <span>Order #{order.token}</span>
           </CardTitle>
@@ -84,7 +84,7 @@ function MyOrderCard({ order }: { order: Order }) {
   );
 }
 
-export default function MyOrdersPage() {
+function MyOrdersView() {
   const searchParams = useSearchParams();
   const { myOrders, fetchMyOrders, myOrdersLoading } = useOrder();
   
@@ -194,4 +194,17 @@ export default function MyOrdersPage() {
       </main>
     </>
   );
+}
+
+export default function MyOrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <p className="ml-4 text-muted-foreground">Loading Your Orders...</p>
+      </div>
+    }>
+      <MyOrdersView />
+    </Suspense>
+  )
 }
