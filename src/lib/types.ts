@@ -30,6 +30,7 @@ export interface Order {
   customerName: string; // mapped from 'customer.name'
   customerPhone: string; // mapped from 'customer.phone'
   total: number; // mapped from 'amount'
+  amountDue?: number; // optional amount due
   timestamp: number; // mapped from 'createdAt'
-  status: 'new' | 'paid' | 'done'; // mapped from 'status'
+  status: 'new' | 'paid' | 'done' | 'created' | 'served'; // mapped from 'status'
 }

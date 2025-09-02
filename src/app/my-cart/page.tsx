@@ -13,44 +13,100 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { useToast } from '@/hooks/use-toast';
+import type { Order } from '@/lib/types';
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 const CUSTOMER_NAME_KEY = 'customerName';
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, cartTotal, cartCount, clearCart } = useOrder();
+  const {
+    cart,
+    removeFromCart,
+    updateQuantity,
+    cartTotal,
+    cartCount,
+    clearCart,
+    activeOrderIdForUpdate,
+    clearActiveOrderId,
+    setMyOrders,
+    myOrders,
+  } = useOrder();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isClient, setIsClient] = useState(false);
-  const [placingOrder, setPlacingOrder] = useState(false);
+  const [loading, setLoading] = useState<'payNow' | 'payLater' | null>(null);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
     try {
       const savedPhone = localStorage.getItem(CUSTOMER_PHONE_KEY);
-      if (savedPhone) {
-        setCustomerPhone(savedPhone);
-      }
+      if (savedPhone) setCustomerPhone(savedPhone);
       const savedName = localStorage.getItem(CUSTOMER_NAME_KEY);
-      if (savedName) {
-        setCustomerName(savedName);
-      }
+      if (savedName) setCustomerName(savedName);
     } catch (error) {
       console.error("Could not read from localStorage", error);
     }
   }, []);
+  
+  const saveCustomerDetails = () => {
+     localStorage.setItem(CUSTOMER_PHONE_KEY, customerPhone);
+     localStorage.setItem(CUSTOMER_NAME_KEY, customerName);
+  }
 
-  const handlePlaceOrder = async () => {
+  const handleUpdateOrder = async (paymentMethod: 'pay-later' | 'online') => {
+    if (!activeOrderIdForUpdate) return;
+    setLoading(paymentMethod === 'pay-later' ? 'payLater' : 'payNow');
+    
     try {
-      setPlacingOrder(true);
-      
-      // Save details to localStorage before proceeding
-      localStorage.setItem(CUSTOMER_PHONE_KEY, customerPhone);
-      localStorage.setItem(CUSTOMER_NAME_KEY, customerName);
-
       const payload = {
-        items: cart.map((item) => ({
+        items: cart.map(item => ({
+          sku: item.name,
+          qty: item.quantity,
+          price: item.price,
+        })),
+        paymentMethod,
+      };
+
+      const res = await axios.patch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${activeOrderIdForUpdate}`,
+        payload,
+        { headers: { "Content-Type": "application/json" } }
+      );
+      
+      const order = res.data;
+      
+      clearCart();
+      clearActiveOrderId();
+
+      if (paymentMethod === 'online' && order.checkoutPageUrl) {
+         window.location.href = order.checkoutPageUrl;
+      } else {
+        // For pay-later or if online payment doesn't return a URL, go to the order page
+        router.push(`/order/${activeOrderIdForUpdate}`);
+      }
+
+    } catch (err) {
+      console.error("Error updating order:", err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Something went wrong while updating your order.',
+      });
+      setLoading(null);
+    }
+  };
+
+
+  const handleCreateOrder = async (paymentMethod: 'pay-later' | 'online') => {
+    setLoading(paymentMethod === 'pay-later' ? 'payLater' : 'payNow');
+    saveCustomerDetails();
+
+    try {
+      const payload = {
+        items: cart.map(item => ({
           sku: item.name,
           qty: item.quantity,
           price: item.price,
@@ -59,50 +115,76 @@ export default function CartPage() {
           name: customerName,
           phone: `+91${customerPhone}`,
         },
+        paymentMethod,
       };
+      
+      const endpoint = paymentMethod === 'pay-later' ? '/api/orderv2' : '/api/orders';
 
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}${endpoint}`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       );
 
-      console.log("Order API Response:", res.data);
+      clearCart();
 
-      // The backend will provide a URL to the checkout/payment page.
-      if (res.data.checkoutPageUrl) {
-        clearCart();
-        // Redirect the user to the payment gateway.
-        window.location.href = res.data.checkoutPageUrl;
+      if (paymentMethod === 'online') {
+        const backendOrder = res.data;
+        if (backendOrder && backendOrder.checkoutPageUrl) {
+           window.location.href = backendOrder.checkoutPageUrl;
+        } else {
+            throw new Error("Could not get payment URL from backend for online payment.");
+        }
       } else {
-        console.error("checkoutPageUrl not found in response");
-        alert("Something went wrong, could not proceed to payment.");
+        // For 'pay-later'
+        const backendOrder = res.data;
+        if (backendOrder && backendOrder.id) {
+            router.push(`/order/${backendOrder.id}`);
+        } else {
+            throw new Error("Could not get order confirmation details from backend.");
+        }
       }
-
     } catch (err) {
       console.error("Error placing order:", err);
-      alert("Something went wrong while placing your order.");
-    } finally {
-      setPlacingOrder(false);
+       toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: (err as Error).message || 'Something went wrong while placing your order.',
+      });
+      setLoading(null);
+    }
+  };
+
+  const handlePayNow = () => {
+    if (activeOrderIdForUpdate) {
+      handleUpdateOrder('online');
+    } else {
+      handleCreateOrder('online');
+    }
+  };
+  
+  const handlePayLater = () => {
+    if (activeOrderIdForUpdate) {
+      handleUpdateOrder('pay-later');
+    } else {
+      handleCreateOrder('pay-later');
     }
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^[a-zA-Z\s]*$/.test(value)) {
-      setCustomerName(value);
-    }
+    if (/^[a-zA-Z\s]*$/.test(value)) setCustomerName(value);
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^\d*$/.test(value) && value.length <= 10) {
-      setCustomerPhone(value);
-    }
+    if (/^\d*$/.test(value) && value.length <= 10) setCustomerPhone(value);
   };
 
-  const isPlaceOrderDisabled =
-    cart.length === 0 || !customerName.trim() || customerPhone.length !== 10 || placingOrder;
+  const isCheckoutDisabled =
+    cart.length === 0 ||
+    (!activeOrderIdForUpdate && (!customerName.trim() || customerPhone.length !== 10)) ||
+    !!loading;
 
   if (!isClient) return null;
 
@@ -112,10 +194,10 @@ export default function CartPage() {
       <main className="container mx-auto py-8 px-4">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary">
-            My Cart
+            {activeOrderIdForUpdate ? 'Add Items to Order' : 'My Cart'}
           </h1>
           <p className="text-lg text-muted-foreground mt-2">
-            You have {cartCount} items in your cart.
+            You have {cartCount} items ready to be added.
           </p>
         </div>
 
@@ -139,35 +221,16 @@ export default function CartPage() {
                           INR {item.price}
                         </p>
                         <div className="flex items-center gap-2 mt-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() =>
-                              updateQuantity(item.id, item.quantity - 1)
-                            }
-                          >
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
                             <MinusCircle className="h-4 w-4" />
                           </Button>
                           <span>{item.quantity}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() =>
-                              updateQuantity(item.id, item.quantity + 1)
-                            }
-                          >
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
                             <PlusCircle className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => removeFromCart(item.id)}
-                      >
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeFromCart(item.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -178,50 +241,32 @@ export default function CartPage() {
 
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Checkout</CardTitle>
+                <CardTitle>{activeOrderIdForUpdate ? 'Confirm Items' : 'Checkout'}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex justify-between font-bold text-lg mb-4">
-                  <span>Total</span>
+                  <span>{activeOrderIdForUpdate ? 'Additional Amount' : 'Total'}</span>
                   <span>INR {cartTotal}</span>
                 </div>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="customerName">Your Name</Label>
-                    <Input
-                      id="customerName"
-                      value={customerName}
-                      onChange={handleNameChange}
-                      placeholder="e.g. John D."
-                    />
+                {!activeOrderIdForUpdate && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="customerName">Your Name</Label>
+                      <Input id="customerName" value={customerName} onChange={handleNameChange} placeholder="e.g. John D." />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customerPhone">Phone Number</Label>
+                      <Input id="customerPhone" type="tel" value={customerPhone} onChange={handlePhoneChange} placeholder="e.g. 9876543210" />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="customerPhone">Phone Number</Label>
-                    <Input
-                      id="customerPhone"
-                      type="tel"
-                      value={customerPhone}
-                      onChange={handlePhoneChange}
-                      placeholder="e.g. 9876543210"
-                    />
-                  </div>
-                </div>
+                )}
               </CardContent>
-              <CardFooter>
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={handlePlaceOrder}
-                  disabled={isPlaceOrderDisabled}
-                >
-                  {placingOrder ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Placing Order...
-                    </>
-                  ) : (
-                    'Place Order'
-                  )}
+              <CardFooter className="flex-col sm:flex-row gap-2">
+                <Button size="lg" className="w-full" onClick={handlePayLater} disabled={isCheckoutDisabled}>
+                  {loading === 'payLater' ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( activeOrderIdForUpdate ? 'Add & Pay Later' : 'Pay Later' )}
+                </Button>
+                <Button size="lg" className="w-full" onClick={handlePayNow} disabled={isCheckoutDisabled}>
+                  {loading === 'payNow' ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( activeOrderIdForUpdate ? 'Add & Pay Now' : 'Pay Now' )}
                 </Button>
               </CardFooter>
             </Card>

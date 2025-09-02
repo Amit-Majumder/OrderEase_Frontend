@@ -5,21 +5,30 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 import type { CartItem, MenuItem, Order } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
 
 interface OrderContextType {
   cart: CartItem[];
   myOrders: Order[];
   kitchenOrders: Order[];
-  loading: boolean; // For kitchen orders
-  myOrdersLoading: boolean; // For my orders
+  loading: boolean;
+  myOrdersLoading: boolean;
   error: string | null;
-  fetchMyOrders: (phone: string) => Promise<void>;
+  activeOrderIdForUpdate: string | null;
+  orderToUpdate: Order | null;
+  setActiveOrderIdForUpdate: (orderId: string, order: Order) => void;
+  clearActiveOrderId: () => void;
+  clearOrderToUpdate: () => void;
+  fetchMyOrders: (phone: string) => Promise<Order[] | undefined>;
+  fetchKitchenOrders: () => Promise<void>;
   setKitchenOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+  setMyOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   addToCart: (item: MenuItem) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  completeOrder: (id: string) => Promise<boolean>; 
+  completeOrder: (id: string) => Promise<boolean>;
+  markAsPaid: (id: string) => Promise<boolean>;
   cartTotal: number;
   cartCount: number;
   inProgressOrderCount: number;
@@ -28,6 +37,9 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
+const ACTIVE_ORDER_ID_KEY = 'activeOrderIdForUpdate';
+const ORDER_TO_UPDATE_KEY = 'orderToUpdate';
+
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -36,15 +48,31 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOrdersLoading, setMyOrdersLoading] = useState(false);
+  const [activeOrderIdForUpdate, setActiveOrderIdForUpdateState] = useState<string | null>(null);
+  const [orderToUpdate, setOrderToUpdate] = useState<Order | null>(null);
+  const router = useRouter();
 
+
+  useEffect(() => {
+    try {
+      const savedOrderId = localStorage.getItem(ACTIVE_ORDER_ID_KEY);
+      if (savedOrderId) {
+        setActiveOrderIdForUpdateState(savedOrderId);
+        const savedOrder = localStorage.getItem(ORDER_TO_UPDATE_KEY);
+        if (savedOrder) {
+            setOrderToUpdate(JSON.parse(savedOrder));
+        }
+      }
+    } catch (error) {
+      console.error("Could not read from localStorage", error);
+    }
+  }, []);
 
   const fetchKitchenOrders = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/today`
-      );
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/today`);
       const backendOrders = res.data.orders || [];
 
       const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
@@ -76,9 +104,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     if (!phone || phone.length !== 10) return;
     setMyOrdersLoading(true);
     try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phone}`
-      );
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phone}`);
       const backendOrders = res.data.orders || [];
       const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
         token: order.orderToken,
@@ -95,10 +121,13 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
           price: item.price,
         })),
       }));
-      setMyOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
+      const sortedOrders = fetchedOrders.sort((a, b) => b.timestamp - a.timestamp);
+      setMyOrders(sortedOrders);
+      return sortedOrders;
     } catch (err) {
       console.error('Error fetching my orders:', err);
-      // We don't set a general error here not to disrupt other parts of the UI
+      setMyOrders([]);
+      return [];
     } finally {
       setMyOrdersLoading(false);
     }
@@ -111,6 +140,36 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         fetchMyOrders(cachedPhone);
     }
   }, [fetchKitchenOrders, fetchMyOrders]);
+
+  const setActiveOrderIdForUpdate = (orderId: string, order: Order) => {
+    try {
+      localStorage.setItem(ACTIVE_ORDER_ID_KEY, orderId);
+      localStorage.setItem(ORDER_TO_UPDATE_KEY, JSON.stringify(order));
+      setActiveOrderIdForUpdateState(orderId);
+      setOrderToUpdate(order);
+      clearCart();
+    } catch (error) {
+       console.error("Could not write to localStorage", error);
+    }
+  };
+
+  const clearActiveOrderId = () => {
+    try {
+      localStorage.removeItem(ACTIVE_ORDER_ID_KEY);
+      setActiveOrderIdForUpdateState(null);
+    } catch (error) {
+       console.error("Could not write to localStorage", error);
+    }
+  };
+
+  const clearOrderToUpdate = () => {
+    try {
+      localStorage.removeItem(ORDER_TO_UPDATE_KEY);
+      setOrderToUpdate(null);
+    } catch (error) {
+       console.error("Could not write to localStorage", error);
+    }
+  };
 
 
   const addToCart = (item: MenuItem) => {
@@ -145,39 +204,53 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
 
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
-  const inProgressOrderCount = myOrders.filter(order => order.status !== 'done').length;
+  const inProgressOrderCount = myOrders.filter(order => order.status === 'paid' || order.status === 'created').length;
+
+  const markAsPaid = async (id: string): Promise<boolean> => {
+     try {
+      const res = await axios.patch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
+        { status: 'paid' }
+      );
+
+      if (res.status === 200) {
+        const update = (prevOrders: Order[]) => prevOrders.map(order =>
+          order.id === id ? { ...order, status: 'paid' } : order
+        );
+        setKitchenOrders(update);
+        setMyOrders(update);
+        toast({ title: "Success", description: "Order marked as paid." });
+        return true;
+      } else {
+        throw new Error('Backend update failed');
+      }
+    } catch (error) {
+      console.error(`Failed to mark order ${id} as paid:`, error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not mark order as paid." });
+      return false;
+    }
+  };
 
   const completeOrder = async (id: string): Promise<boolean> => {
     try {
-        const res = await axios.patch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`, 
-            { status: 'done' }
-        );
+      const res = await axios.patch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
+        { status: 'served' }
+      );
 
-        if (res.status === 200) {
-          setKitchenOrders(prevOrders => 
-            prevOrders.map(order => 
-              order.id === id ? { ...order, status: 'done' } : order
-            ).sort((a, b) => b.timestamp - a.timestamp)
-          );
-          // Also refresh myOrders if the completed order is in that list
-          setMyOrders(prevOrders =>
-            prevOrders.map(order =>
-              order.id === id ? { ...order, status: 'done' } : order
-            )
-          );
-          return true;
-        } else {
-           throw new Error("Backend update failed");
-        }
+      if (res.status === 200) {
+        const update = (prevOrders: Order[]) => prevOrders.map(order =>
+          order.id === id ? { ...order, status: 'served' } : order
+        );
+        setKitchenOrders(update);
+        setMyOrders(update);
+        return true;
+      } else {
+        throw new Error('Backend update failed');
+      }
     } catch (error) {
-        console.error(`Failed to complete order ${id}:`, error);
-        toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Could not complete the order. Please try again."
-        })
-        return false;
+      console.error(`Failed to complete order ${id}:`, error);
+      return false;
     }
   };
 
@@ -190,13 +263,21 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         loading,
         myOrdersLoading,
         error,
+        activeOrderIdForUpdate,
+        orderToUpdate,
+        setActiveOrderIdForUpdate,
+        clearActiveOrderId,
+        clearOrderToUpdate,
         setKitchenOrders,
+        setMyOrders,
         fetchMyOrders,
+        fetchKitchenOrders,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
         completeOrder,
+        markAsPaid,
         cartTotal,
         cartCount,
         inProgressOrderCount,

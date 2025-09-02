@@ -6,18 +6,23 @@ import { ChefHat, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import type { Order } from '@/lib/types';
 import { useOrder } from '@/context/OrderContext';
+import { KitchenHeader } from '@/components/KitchenHeader';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function KitchenPage() {
-  const { kitchenOrders, setKitchenOrders, loading, error } = useOrder();
+  const { kitchenOrders, setKitchenOrders, loading, error, completeOrder } = useOrder();
 
-  const handleOrderCompletion = (orderId: string) => {
-    // The logic is now handled optimistically in the context,
-    // but we still pass this down to the card.
-    // The context will update the `kitchenOrders` state, causing a re-render.
+  const handleOrderCompletion = (order: Order) => {
+    // This function is called when the 'Mark as Complete' button is clicked.
+    // It checks if the order is already paid. If so, it marks it as served.
+    if (order.status === 'paid') {
+        completeOrder(order.id);
+    }
   };
-  
-  const newOrders = kitchenOrders.filter((order) => order.status === 'paid');
-  const completedOrders = kitchenOrders.filter((order) => order.status === 'done');
+
+  const newOrders = kitchenOrders.filter((order) => order.status !== 'served' && order.status !== 'done');
+  const completedOrders = kitchenOrders.filter((order) => order.status === 'served' || order.status === 'done');
 
   if (loading) {
     return (
@@ -30,20 +35,18 @@ export default function KitchenPage() {
 
   return (
     <div className="min-h-screen bg-muted/40">
-      <header className="bg-background shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto p-4 flex justify-center items-center">
-          <div className="flex items-center gap-3 cursor-default">
-            <ChefHat className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold font-headline">Kitchen</h1>
-          </div>
-        </div>
-      </header>
+       <KitchenHeader />
 
       <main className="container mx-auto p-4 md:p-8">
-         {error && (
-            <div className="text-center py-16 bg-destructive/10 text-destructive rounded-lg mb-8">
-                 <p>{error}</p>
-            </div>
+        <div className="text-center mb-12">
+            <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary">Our Kitchen</h1>
+            <p className="text-lg text-muted-foreground mt-2">Manage and track live orders.</p>
+        </div>
+        
+        {error && (
+          <div className="text-center py-16 bg-destructive/10 text-destructive rounded-lg mb-8">
+            <p>{error}</p>
+          </div>
         )}
 
         <section>
@@ -66,9 +69,9 @@ export default function KitchenPage() {
         <section>
           <h2 className="text-2xl font-semibold font-headline text-muted-foreground mb-4">Completed Orders ({completedOrders.length})</h2>
           {completedOrders.length > 0 ? (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {completedOrders.map((order) => (
-                <OrderCard key={order.id} order={order} onOrderCompleted={handleOrderCompletion} />
+                <OrderCard key={order.id} order={order} onOrderCompleted={() => {}} />
               ))}
             </div>
           ) : (

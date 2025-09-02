@@ -12,19 +12,23 @@ import {
 import { useOrder } from '@/context/OrderContext';
 import type { Order } from '@/lib/types';
 import { Button } from './ui/button';
-import { CheckCircle, Loader2, CircleDashed } from 'lucide-react';
+import { CheckCircle, Loader2, CircleDashed, CreditCard, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface OrderCardProps {
   order: Order;
-  onOrderCompleted: (orderId: string) => void;
+  onOrderCompleted: (order: Order) => void;
 }
 
 export function OrderCard({ order, onOrderCompleted }: OrderCardProps) {
-  const { completeOrder } = useOrder();
+  const { completeOrder, markAsPaid, setActiveOrderIdForUpdate } = useOrder();
+  const [isPaying, setIsPaying] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const router = useRouter();
+
 
   const time = new Date(order.timestamp).toLocaleTimeString([], {
     hour: '2-digit',
@@ -32,39 +36,47 @@ export function OrderCard({ order, onOrderCompleted }: OrderCardProps) {
     hour12: true,
   });
 
-  const handleComplete = async () => {
-    setIsCompleting(true);
-    const success = await completeOrder(order.id);
-    // The onOrderCompleted prop is kept for potential future use,
-    // but the primary state update is now handled in the context.
-    if (success) {
-      onOrderCompleted(order.id);
+  const handlePaid = async () => {
+    setIsPaying(true);
+    const success = await markAsPaid(order.id);
+    if (success && isCompleting) {
+        await completeOrder(order.id);
     }
-    // Don't set isCompleting to false if successful,
-    // as the card will change state and the button will disappear.
-    if (!success) {
-        setIsCompleting(false);
-    }
+    setIsPaying(false);
   }
 
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    if (isPaid) {
+      await completeOrder(order.id);
+    }
+    onOrderCompleted(order);
+  }
+
+  const handleAddItems = () => {
+    setActiveOrderIdForUpdate(order.id, order);
+    router.push('/kitchen/create');
+  };
+
   const phoneNumber10Digits = order.customerPhone.slice(-10);
-  const isCompleted = order.status === 'done';
+  const isPaid = order.status === 'paid' || order.status === 'served';
+  const isServed = order.status === 'served' || order.status === 'done';
 
   return (
     <Card
       className={cn(
         'flex flex-col transition-all',
-        isCompleted ? 'bg-muted/50 border-dashed' : 'bg-card'
+        isServed ? 'bg-muted/50 border-dashed' : 'bg-card'
       )}
     >
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
                  <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                    {isCompleted ? (
+                    {isServed ? (
                         <CheckCircle className="text-accent" />
                     ) : (
-                        <CircleDashed className="text-primary animate-spin" />
+                        <CircleDashed className={cn(order.status === 'created' && 'text-yellow-500', isPaid && 'text-primary' )} />
                     )}
                     #{order.token}
                 </CardTitle>
@@ -90,18 +102,29 @@ export function OrderCard({ order, onOrderCompleted }: OrderCardProps) {
             </ul>
         </ScrollArea>
       </CardContent>
-      <CardFooter>
-        {order.status === 'paid' && (
-          <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleComplete} disabled={isCompleting}>
-            {isCompleting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle className="mr-2 h-4 w-4" />
-            )}
-            {isCompleting ? 'Completing...' : 'Mark as Complete'}
-          </Button>
-        )}
-        {isCompleted && (
+      <CardFooter className="flex-col gap-2">
+        {!isServed ? (
+             <div className="w-full flex flex-col gap-2">
+                 <Button className="w-full" variant="outline" onClick={handleAddItems} disabled={isServed}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Another Item
+                </Button>
+                <div className="flex w-full gap-2">
+                    <Button className="w-full" variant={isPaid ? 'outline' : 'default'} onClick={handlePaid} disabled={isPaid || isPaying}>
+                        {isPaying ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : ( <CreditCard className="mr-2 h-4 w-4" /> )}
+                        {isPaid ? 'Paid' : 'Mark as Paid'}
+                    </Button>
+                    <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleComplete} disabled={isCompleting}>
+                        {isCompleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        )}
+                        {isCompleting ? 'Completing...' : 'Mark as Complete'}
+                    </Button>
+                </div>
+            </div>
+        ) : (
            <p className="w-full text-center text-sm text-muted-foreground">Order fulfilled.</p>
         )}
       </CardFooter>
