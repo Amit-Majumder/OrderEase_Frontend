@@ -22,7 +22,8 @@ export default function CartPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isClient, setIsClient] = useState(false);
-  const [placingOrder, setPlacingOrder] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitAction, setSubmitAction] = useState<'payNow' | 'payLater' | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,17 +42,24 @@ export default function CartPage() {
     }
   }, []);
 
-  const handlePlaceOrder = async () => {
+  const saveCustomerDetails = () => {
     try {
-      setPlacingOrder(true);
-      
-      // Save details to localStorage before proceeding
       localStorage.setItem(CUSTOMER_PHONE_KEY, customerPhone);
       localStorage.setItem(CUSTOMER_NAME_KEY, customerName);
+    } catch(e) {
+      console.error("Could not write to localStorage", e);
+    }
+  }
 
+  const handlePayNow = async () => {
+    setSubmitAction('payNow');
+    setIsSubmitting(true);
+    saveCustomerDetails();
+    
+    try {
       const payload = {
         items: cart.map((item) => ({
-          sku: item.name,
+          sku: item.name.toLowerCase().replace(/ /g, '-'),
           qty: item.quantity,
           price: item.price,
         })),
@@ -67,23 +75,57 @@ export default function CartPage() {
         { headers: { "Content-Type": "application/json" } }
       );
 
-      console.log("Order API Response:", res.data);
-
-      // The backend will provide a URL to the checkout/payment page.
       if (res.data.checkoutPageUrl) {
         clearCart();
-        // Redirect the user to the payment gateway.
         window.location.href = res.data.checkoutPageUrl;
       } else {
         console.error("checkoutPageUrl not found in response");
         alert("Something went wrong, could not proceed to payment.");
+        setIsSubmitting(false);
       }
 
     } catch (err) {
       console.error("Error placing order:", err);
       alert("Something went wrong while placing your order.");
+      setIsSubmitting(false);
+    } 
+  };
+  
+  const handlePayLater = async () => {
+    setSubmitAction('payLater');
+    setIsSubmitting(true);
+    saveCustomerDetails();
+
+    try {
+       const payload = {
+        items: cart.map(item => ({
+          sku: item.name.toLowerCase().replace(/ /g, '-'),
+          qty: item.quantity,
+          price: item.price
+        })),
+        customer: {
+          name: customerName,
+          phone: `+91${customerPhone}`,
+        },
+      };
+
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orderv2`,
+        payload
+      );
+
+      if (res.status === 200 && res.data.id) {
+        clearCart();
+        router.push(`/order/${res.data.id}`);
+      } else {
+        throw new Error('Failed to create order. Invalid response from server.');
+      }
+    } catch (err) {
+      console.error("Error creating order (Pay Later):", err);
+      alert("Something went wrong while creating your order.");
     } finally {
-      setPlacingOrder(false);
+      setIsSubmitting(false);
+      setSubmitAction(null);
     }
   };
 
@@ -101,8 +143,8 @@ export default function CartPage() {
     }
   };
 
-  const isPlaceOrderDisabled =
-    cart.length === 0 || !customerName.trim() || customerPhone.length !== 10 || placingOrder;
+  const isFormInvalid =
+    cart.length === 0 || !customerName.trim() || customerPhone.length !== 10;
 
   if (!isClient) return null;
 
@@ -207,20 +249,36 @@ export default function CartPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button
                   size="lg"
                   className="w-full"
-                  onClick={handlePlaceOrder}
-                  disabled={isPlaceOrderDisabled}
+                  onClick={handlePayNow}
+                  disabled={isFormInvalid || isSubmitting}
                 >
-                  {placingOrder ? (
+                  {isSubmitting && submitAction === 'payNow' ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Pay Now'
+                  )}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handlePayLater}
+                  disabled={isFormInvalid || isSubmitting}
+                >
+                  {isSubmitting && submitAction === 'payLater' ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Placing Order...
                     </>
                   ) : (
-                    'Place Order'
+                    'Pay Later'
                   )}
                 </Button>
               </CardFooter>
