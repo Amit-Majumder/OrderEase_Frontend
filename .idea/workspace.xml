@@ -4,7 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="21f0fd4e-c35e-46ee-a3c6-c1cf284021db" name="Changes" comment="" />
+    <list default="true" id="21f0fd4e-c35e-46ee-a3c6-c1cf284021db" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/kitchen/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/kitchen/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/my-cart/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/my-cart/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/my-orders/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/my-orders/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/order/[token]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/order/[token]/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/MyOrdersButton.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/MyOrdersButton.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/OrderCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/OrderCard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/context/OrderContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/context/OrderContext.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/types.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

@@ -2,33 +2,28 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { CartItem, MenuItem, Order } from '@/lib/types';
-import { toast } from '@/hooks/use-toast';
+import type { CartItem, MenuItem, Order, OrderItem } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
-import { useRouter } from 'next/navigation';
 
 interface OrderContextType {
   cart: CartItem[];
   myOrders: Order[];
   kitchenOrders: Order[];
-  loading: boolean;
-  myOrdersLoading: boolean;
+  loading: boolean; // For kitchen orders
+  myOrdersLoading: boolean; // For my orders
   error: string | null;
-  activeOrderIdForUpdate: string | null;
-  orderToUpdate: Order | null;
-  setActiveOrderIdForUpdate: (orderId: string, order: Order) => void;
-  clearActiveOrderId: () => void;
-  clearOrderToUpdate: () => void;
-  fetchMyOrders: (phone: string) => Promise<Order[] | undefined>;
+  fetchMyOrders: (phone: string) => Promise<void>;
   fetchKitchenOrders: () => Promise<void>;
   setKitchenOrders: React.Dispatch<React.SetStateAction<Order[]>>;
-  setMyOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   addToCart: (item: MenuItem) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
-  completeOrder: (id: string) => Promise<boolean>;
   markAsPaid: (id: string) => Promise<boolean>;
+  completeOrder: (id: string) => Promise<boolean>;
+  cancelOrder: (id: string) => Promise<boolean>;
+  updateOrderItems: (orderId: string, customer: { name: string, phone: string }, items: { sku: string, qty: number, price: number }[]) => Promise<boolean>;
   cartTotal: number;
   cartCount: number;
   inProgressOrderCount: number;
@@ -37,9 +32,6 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
-const ACTIVE_ORDER_ID_KEY = 'activeOrderIdForUpdate';
-const ORDER_TO_UPDATE_KEY = 'orderToUpdate';
-
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -48,40 +40,26 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOrdersLoading, setMyOrdersLoading] = useState(false);
-  const [activeOrderIdForUpdate, setActiveOrderIdForUpdateState] = useState<string | null>(null);
-  const [orderToUpdate, setOrderToUpdate] = useState<Order | null>(null);
-  const router = useRouter();
+  const {toast} = useToast();
 
-
-  useEffect(() => {
-    try {
-      const savedOrderId = localStorage.getItem(ACTIVE_ORDER_ID_KEY);
-      if (savedOrderId) {
-        setActiveOrderIdForUpdateState(savedOrderId);
-        const savedOrder = localStorage.getItem(ORDER_TO_UPDATE_KEY);
-        if (savedOrder) {
-            setOrderToUpdate(JSON.parse(savedOrder));
-        }
-      }
-    } catch (error) {
-      console.error("Could not read from localStorage", error);
-    }
-  }, []);
 
   const fetchKitchenOrders = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/today`);
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/today`
+      );
       const backendOrders = res.data.orders || [];
 
       const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
         id: order._id,
         token: order.orderToken,
-        customerName: order.customer.name,
-        customerPhone: order.customer.phone,
+        customerName: order.customer?.name || '',
+        customerPhone: order.customer?.phone || '',
         total: order.amount,
-        status: order.status,
+        amountDue: order.amountDue,
+        status: order.status === 'created' ? 'new' : order.status,
         timestamp: new Date(order.createdAt).getTime(),
         items: order.lineItems.map((item: any) => ({
           id: item._id,
@@ -89,6 +67,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
           quantity: item.qty,
           price: item.price,
         })),
+        served: order.served || false,
       }));
 
       setKitchenOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
@@ -104,15 +83,18 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     if (!phone || phone.length !== 10) return;
     setMyOrdersLoading(true);
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phone}`);
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phone}`
+      );
       const backendOrders = res.data.orders || [];
       const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
         token: order.orderToken,
         id: order._id,
-        customerName: order.customer.name,
-        customerPhone: order.customer.phone,
+        customerName: order.customer?.name || '',
+        customerPhone: order.customer?.phone || '',
         total: order.amount,
-        status: order.status,
+        amountDue: order.amountDue,
+        status: order.status === 'created' ? 'new' : order.status,
         timestamp: new Date(order.createdAt).getTime(),
         items: order.lineItems.map((item: any) => ({
           id: item._id,
@@ -120,14 +102,12 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
           quantity: item.qty,
           price: item.price,
         })),
+        served: order.served || false,
       }));
-      const sortedOrders = fetchedOrders.sort((a, b) => b.timestamp - a.timestamp);
-      setMyOrders(sortedOrders);
-      return sortedOrders;
+      setMyOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
     } catch (err) {
       console.error('Error fetching my orders:', err);
-      setMyOrders([]);
-      return [];
+      // We don't set a general error here not to disrupt other parts of the UI
     } finally {
       setMyOrdersLoading(false);
     }
@@ -140,36 +120,6 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         fetchMyOrders(cachedPhone);
     }
   }, [fetchKitchenOrders, fetchMyOrders]);
-
-  const setActiveOrderIdForUpdate = (orderId: string, order: Order) => {
-    try {
-      localStorage.setItem(ACTIVE_ORDER_ID_KEY, orderId);
-      localStorage.setItem(ORDER_TO_UPDATE_KEY, JSON.stringify(order));
-      setActiveOrderIdForUpdateState(orderId);
-      setOrderToUpdate(order);
-      clearCart();
-    } catch (error) {
-       console.error("Could not write to localStorage", error);
-    }
-  };
-
-  const clearActiveOrderId = () => {
-    try {
-      localStorage.removeItem(ACTIVE_ORDER_ID_KEY);
-      setActiveOrderIdForUpdateState(null);
-    } catch (error) {
-       console.error("Could not write to localStorage", error);
-    }
-  };
-
-  const clearOrderToUpdate = () => {
-    try {
-      localStorage.removeItem(ORDER_TO_UPDATE_KEY);
-      setOrderToUpdate(null);
-    } catch (error) {
-       console.error("Could not write to localStorage", error);
-    }
-  };
 
 
   const addToCart = (item: MenuItem) => {
@@ -204,34 +154,9 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
 
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
-  const inProgressOrderCount = myOrders.filter(order => order.status === 'paid' || order.status === 'created').length;
+  const inProgressOrderCount = myOrders.filter(order => order.status !== 'done' && order.status !== 'served').length;
 
-  const markAsPaid = async (id: string): Promise<boolean> => {
-     try {
-      const res = await axios.patch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
-        { status: 'paid' }
-      );
-
-      if (res.status === 200) {
-        const update = (prevOrders: Order[]) => prevOrders.map(order =>
-          order.id === id ? { ...order, status: 'paid' } : order
-        );
-        setKitchenOrders(update);
-        setMyOrders(update);
-        toast({ title: "Success", description: "Order marked as paid." });
-        return true;
-      } else {
-        throw new Error('Backend update failed');
-      }
-    } catch (error) {
-      console.error(`Failed to mark order ${id} as paid:`, error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not mark order as paid." });
-      return false;
-    }
-  };
-
-  const completeOrder = async (id: string): Promise<boolean> => {
+ const completeOrder = async (id: string): Promise<boolean> => {
     try {
       const res = await axios.patch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
@@ -239,11 +164,22 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       );
 
       if (res.status === 200) {
-        const update = (prevOrders: Order[]) => prevOrders.map(order =>
-          order.id === id ? { ...order, status: 'served' } : order
-        );
-        setKitchenOrders(update);
-        setMyOrders(update);
+        const updateOrderState = (prevOrders: Order[]) =>
+          prevOrders.map((order) => {
+            if (order.id === id) {
+              const updatedOrder = { ...order, served: true };
+              // If also paid, mark as done
+              if (updatedOrder.status === 'paid') {
+                updatedOrder.status = 'done';
+              }
+              return updatedOrder;
+            }
+            return order;
+          }).sort((a, b) => b.timestamp - a.timestamp);
+
+        setKitchenOrders(updateOrderState);
+        setMyOrders(updateOrderState);
+        
         return true;
       } else {
         throw new Error('Backend update failed');
@@ -254,6 +190,98 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const markAsPaid = async (id: string): Promise<boolean> => {
+    try {
+      const res = await axios.patch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
+        { status: 'paid' }
+      );
+
+      if (res.status === 200) {
+        const updateOrderState = (prevOrders: Order[]) =>
+          prevOrders.map((order) => {
+            if (order.id === id) {
+               const updatedOrder = { ...order, status: 'paid' as const };
+               // If also served, mark as done
+               if (updatedOrder.served) {
+                  updatedOrder.status = 'done';
+               }
+               return updatedOrder;
+            }
+            return order;
+          }).sort((a,b) => b.timestamp - a.timestamp);
+
+        setKitchenOrders(updateOrderState);
+        setMyOrders(updateOrderState);
+        
+        return true;
+      } else {
+        throw new Error('Backend update failed');
+      }
+    } catch (error) {
+      console.error(`Failed to mark order ${id} as paid:`, error);
+      return false;
+    }
+  };
+  
+  const updateOrderItems = async (orderId: string, customer: { name: string, phone: string }, items: { sku: string, qty: number, price: number }[]): Promise<boolean> => {
+    try {
+      const payload = {
+        items,
+        customer,
+      };
+      const res = await axios.put(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${orderId}`,
+        payload
+      );
+
+      if (res.status === 200 && res.data.order) {
+        // We can just refetch all orders to get the latest state
+        await fetchKitchenOrders();
+        return true;
+      } else {
+        throw new Error('Failed to update order. Invalid response from server.');
+      }
+    } catch (error) {
+      console.error(`Failed to update order ${orderId}:`, error);
+       toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Something went wrong while updating the order.',
+      });
+      return false;
+    }
+  };
+
+  const cancelOrder = async (orderId: string): Promise<boolean> => {
+    try {
+      const res = await axios.delete(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${orderId}`
+      );
+
+      if (res.status === 200) {
+        const filterOutOrder = (prevOrders: Order[]) => 
+          prevOrders.filter((order) => order.id !== orderId);
+
+        setKitchenOrders(filterOutOrder);
+        setMyOrders(filterOutOrder);
+        
+        return true;
+      } else {
+        throw new Error('Backend returned an error');
+      }
+    } catch (error) {
+      console.error(`Failed to cancel order ${orderId}:`, error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Something went wrong while cancelling the order.',
+      });
+      return false;
+    }
+  };
+
+
   return (
     <OrderContext.Provider
       value={{
@@ -263,13 +291,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         loading,
         myOrdersLoading,
         error,
-        activeOrderIdForUpdate,
-        orderToUpdate,
-        setActiveOrderIdForUpdate,
-        clearActiveOrderId,
-        clearOrderToUpdate,
         setKitchenOrders,
-        setMyOrders,
         fetchMyOrders,
         fetchKitchenOrders,
         addToCart,
@@ -278,6 +300,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         clearCart,
         completeOrder,
         markAsPaid,
+        cancelOrder,
+        updateOrderItems,
         cartTotal,
         cartCount,
         inProgressOrderCount,

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Card,
@@ -22,12 +22,11 @@ const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 const CUSTOMER_NAME_KEY = 'customerName';
 
 export default function OrderSuccessPage() {
-  const { token: uniqueId } = useParams();
-  const { fetchMyOrders, setActiveOrderIdForUpdate, myOrders } = useOrder();
+  const { token: uniqueId } = useParams(); // This is the unique ID from the URL
+  const { fetchMyOrders } = useOrder();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     async function fetchOrderDetails() {
@@ -36,14 +35,6 @@ export default function OrderSuccessPage() {
         setLoading(false);
         return;
       }
-      
-      const contextualOrder = myOrders.find(o => o.id === uniqueId);
-      if (contextualOrder) {
-        setOrder(contextualOrder);
-        setLoading(false);
-        return;
-      }
-
 
       try {
         setLoading(true);
@@ -54,13 +45,15 @@ export default function OrderSuccessPage() {
         const backendOrder = res.data;
 
         if (backendOrder && backendOrder.orderToken) {
+          // Manually map the backend response to our frontend Order type
           const fetchedOrder: Order = {
             id: backendOrder._id,
             token: backendOrder.orderToken,
             customerName: backendOrder.customer.name,
             customerPhone: backendOrder.customer.phone,
             total: backendOrder.amount,
-            status: backendOrder.status,
+            amountDue: backendOrder.amountDue,
+            status: backendOrder.status === 'paid' ? 'new' : backendOrder.status,
             timestamp: new Date(backendOrder.createdAt).getTime(),
             items: backendOrder.lineItems.map((item: any) => ({
               id: item._id,
@@ -68,6 +61,7 @@ export default function OrderSuccessPage() {
               quantity: item.qty,
               price: item.price,
             })),
+            served: backendOrder.served,
           };
 
           setOrder(fetchedOrder);
@@ -76,6 +70,7 @@ export default function OrderSuccessPage() {
             const phoneNumber10Digits = fetchedOrder.customerPhone.slice(-10);
             localStorage.setItem(CUSTOMER_PHONE_KEY, phoneNumber10Digits);
             localStorage.setItem(CUSTOMER_NAME_KEY, fetchedOrder.customerName);
+            // After successful order, trigger a fetch of my orders
             fetchMyOrders(phoneNumber10Digits);
           } catch(e) {
             console.error("Could not write to localStorage", e);
@@ -94,14 +89,7 @@ export default function OrderSuccessPage() {
     }
 
     fetchOrderDetails();
-  }, [uniqueId, fetchMyOrders, myOrders]);
-
-  const handleAddAnotherItem = () => {
-    if (order) {
-      setActiveOrderIdForUpdate(order.id);
-      router.push('/menu');
-    }
-  };
+  }, [uniqueId, fetchMyOrders]);
 
   if (loading) {
     return (
@@ -134,8 +122,8 @@ export default function OrderSuccessPage() {
     );
   }
 
+  // Extract the last 10 digits from the phone number
   const phoneNumber10Digits = order.customerPhone.slice(-10);
-  const isOrderCompleted = order.status === 'done' || order.status === 'served';
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 p-4">
@@ -173,14 +161,17 @@ export default function OrderSuccessPage() {
              <Separator className="my-4" />
              <div className="flex justify-between font-bold text-lg">
                 <p>Total Paid</p>
-                <p>INR {order.total}</p>
+                <p>INR {order.amountDue}</p>
              </div>
           </div>
 
         </CardContent>
         <CardFooter className="flex-col gap-4">
-          <Button onClick={handleAddAnotherItem} className="w-full" disabled={isOrderCompleted}>
-            {isOrderCompleted ? 'Order Completed' : 'Add Another Item'}
+          <Button asChild className="w-full">
+            <Link href={`/my-orders?phone=${phoneNumber10Digits}`}>View My Orders</Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/menu">Place Another Order</Link>
           </Button>
         </CardFooter>
       </Card>
