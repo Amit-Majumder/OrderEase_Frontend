@@ -7,25 +7,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
-import menuData from '@/lib/menu-data.json';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Plus, Trash2, Minus, AlertTriangle } from 'lucide-react';
 import type { MenuItem } from '@/lib/types';
 import { useState, useMemo, useEffect } from 'react';
-import axios from 'axios';
-import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from './ui/scroll-area';
+import { Separator } from './ui/separator';
+import { axiosInstance } from '@/lib/axios-instance';
 
 interface CreateOrderDialogProps {
   children: React.ReactNode;
@@ -34,11 +25,7 @@ interface CreateOrderDialogProps {
   onOrderCreated: () => void;
 }
 
-interface OrderItemForm {
-  id: number;
-  sku: string;
-  name: string;
-  price: number;
+interface OrderItem extends MenuItem {
   quantity: number;
 }
 
@@ -50,85 +37,123 @@ export function CreateOrderDialog({
 }: CreateOrderDialogProps) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [items, setItems] = useState<OrderItemForm[]>([]);
-  const [nextItemId, setNextItemId] = useState(1);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loadingMenu, setLoadingMenu] = useState(false);
+  const [menuError, setMenuError] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState('All');
 
-  const { toast } = useToast();
+  useEffect(() => {
+    async function fetchMenu() {
+      if (isOpen) {
+        setLoadingMenu(true);
+        setMenuError(null);
+        try {
+          const response = await axiosInstance.get(`/api/menu`);
+          if (response.data && Array.isArray(response.data)) {
+            const formattedMenuItems: MenuItem[] = response.data.map((item: any) => ({
+              id: item._id,
+              name: item.name,
+              description: item.description,
+              price: item.price,
+              image: item.imageUrl,
+              category: item.category,
+            }));
+            const uniqueCategories = Array.from(new Set(formattedMenuItems.map(item => item.category)));
+            uniqueCategories.sort();
+            
+            // Sort menu items alphabetically by name
+            formattedMenuItems.sort((a, b) => a.name.localeCompare(b.name));
+
+            setMenuItems(formattedMenuItems);
+            const allCategories = ['All', ...uniqueCategories];
+            setCategories(allCategories);
+            setActiveCategory(allCategories[0]);
+          } else {
+            throw new Error("Invalid data format from API");
+          }
+        } catch (err) {
+          console.error("Failed to fetch menu:", err);
+          setMenuError("Could not load the menu. Please try again.");
+        } finally {
+          setLoadingMenu(false);
+        }
+      }
+    }
+    fetchMenu();
+  }, [isOpen]);
 
   const resetForm = () => {
     setCustomerName('');
     setCustomerPhone('');
-    setItems([]);
-    setNextItemId(1);
+    setOrderItems([]);
   };
-  
+
   useEffect(() => {
     if (isOpen) {
       resetForm();
     }
   }, [isOpen]);
 
-  const handleAddItem = () => {
-    setItems([...items, { id: nextItemId, sku: '', name: '', quantity: 1, price: 0 }]);
-    setNextItemId(nextItemId + 1);
-  };
-
-  const handleItemChange = (
-    id: number,
-    field: keyof OrderItemForm,
-    value: string | number
-  ) => {
-    setItems(
-      items.map((item) => {
-        if (item.id === id) {
-          const updatedItem = { ...item, [field]: value };
-          if (field === 'sku') {
-            const menuItem = menuData.find((m) => m.id === value);
-            if (menuItem) {
-              updatedItem.price = menuItem.price;
-              updatedItem.name = menuItem.name.toLowerCase().replace(/ /g, '-');
-            }
-          }
-          return updatedItem;
+  const updateItemQuantity = (itemToUpdate: MenuItem, newQuantity: number) => {
+    setOrderItems(prevItems => {
+        if (newQuantity <= 0) {
+            return prevItems.filter(item => item.id !== itemToUpdate.id);
         }
-        return item;
-      })
-    );
+        
+        const existingItem = prevItems.find(item => item.id === itemToUpdate.id);
+        
+        if (existingItem) {
+            return prevItems.map(item => 
+                item.id === itemToUpdate.id 
+                ? { ...item, quantity: newQuantity } 
+                : item
+            );
+        }
+        
+        return [...prevItems, { ...itemToUpdate, quantity: newQuantity }];
+    });
   };
 
-  const handleRemoveItem = (id: number) => {
-    setItems(items.filter((item) => item.id !== id));
+  const handleRemoveItem = (itemId: string) => {
+    setOrderItems((prevItems) => {
+      return prevItems.filter((item) => item.id !== itemId);
+    });
   };
 
   const total = useMemo(() => {
-    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  }, [items]);
+    return orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  }, [orderItems]);
 
   const isSubmitDisabled =
     !customerName.trim() ||
     customerPhone.length !== 10 ||
-    items.length === 0 ||
-    items.some((item) => !item.sku || item.quantity <= 0) ||
+    orderItems.length === 0 ||
     isSubmitting;
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
       const payload = {
-        items: items.map(item => ({
-          sku: item.name,
-          qty: item.quantity,
-          price: item.price
+        items: orderItems.map((item) => ({
+          menuItem: item.id,
+          status: {
+            active: item.quantity,
+            served: 0
+          },
+          price: item.price,
         })),
         customer: {
           name: customerName,
-          phone: `+91${customerPhone}`,
+          phone: customerPhone,
         },
       };
 
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orderv2`,
+      const res = await axiosInstance.post(
+        `/api/orderv2`,
         payload
       );
 
@@ -136,141 +161,186 @@ export function CreateOrderDialog({
         onOrderCreated();
         setIsOpen(false);
       } else {
-        throw new Error('Failed to create order. Invalid response from server.');
+        throw new Error(
+          'Failed to create order. Invalid response from server.'
+        );
       }
     } catch (error) {
       console.error('Failed to create order:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Something went wrong while creating the order.',
-      });
+      // Removed toast
     } finally {
       setIsSubmitting(false);
     }
   };
   
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+     if (/^[a-zA-Z]*$/.test(value) && value.length <= 15) {
+      setCustomerName(value);
+    }
+  };
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (/^\d*$/.test(value) && value.length <= 10) {
-      setCustomerPhone(value);
+      setCustomerPhone(e.target.value);
     }
   };
+  
+  const filteredMenuItems = useMemo(() => {
+    if (activeCategory === 'All') {
+      return menuItems;
+    }
+    return menuItems.filter(item => item.category === activeCategory);
+  }, [activeCategory, menuItems]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-5xl bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Create New Order</DialogTitle>
+          <DialogTitle className="text-cyan-400">Create Order</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-6 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Customer Name</Label>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 py-4">
+          {/* Left Column */}
+          <div className="md:col-span-3 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 id="name"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="e.g. Jane Doe"
+                onChange={handleNameChange}
+                placeholder="Customer Name"
+                className="bg-background"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Customer Phone</Label>
               <Input
                 id="phone"
                 value={customerPhone}
                 onChange={handlePhoneChange}
-                placeholder="10-digit number"
+                placeholder="Customer Phone"
                 type="tel"
+                className="bg-background"
               />
             </div>
-          </div>
-          <div className="space-y-4">
-            <Label>Order Items</Label>
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-end gap-2">
-                  <div className="flex-grow">
-                    <Label className="text-xs text-muted-foreground">
-                      Item
-                    </Label>
-                    <Select
-                      value={item.sku}
-                      onValueChange={(value) =>
-                        handleItemChange(item.id, 'sku', value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an item" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {menuData.map((menuItem: MenuItem) => (
-                          <SelectItem key={menuItem.id} value={menuItem.id}>
-                            {menuItem.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-24">
-                    <Label className="text-xs text-muted-foreground">
-                      Quantity
-                    </Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleItemChange(
-                          item.id,
-                          'quantity',
-                          parseInt(e.target.value) || 1
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="w-24">
-                     <Label className="text-xs text-muted-foreground">
-                      Price
-                    </Label>
-                    <Input value={`INR ${item.price}`} readOnly disabled />
-                  </div>
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveItem(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+            <div>
+             {loadingMenu ? (
+                <div className="flex justify-center items-center h-96">
+                    <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
                 </div>
-              ))}
+             ) : menuError ? (
+                <div className="flex flex-col justify-center items-center h-96 text-destructive">
+                    <AlertTriangle className="h-8 w-8 mb-2" />
+                    <p>{menuError}</p>
+                </div>
+             ) : (
+              <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mt-2 w-full">
+                <TabsList className="w-full justify-start overflow-x-auto bg-transparent p-0 pb-2 flex-nowrap">
+                  {categories.map((cat) => (
+                    <TabsTrigger key={cat} value={cat} className="flex-shrink-0">
+                      {cat}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                <TabsContent value={activeCategory} className="mt-0">
+                  <ScrollArea className="h-[440px] pr-4">
+                    <div className="space-y-2">
+                      {filteredMenuItems.map((item: MenuItem) => {
+                        const currentItem = orderItems.find(oi => oi.id === item.id);
+                        const quantity = currentItem?.quantity || 0;
+                        return (
+                        <div key={item.id} className="flex items-center justify-between p-2 rounded-md bg-background/50">
+                            <div className="flex flex-col">
+                            <span>{item.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                            <div className="font-mono text-sm text-green-400 flex justify-between w-20">
+                                <span>INR</span>
+                                <span>{item.price}</span>
+                            </div>
+                            <div className="flex items-center justify-end w-[90px] h-8">
+                                {quantity === 0 ? (
+                                    <Button size="sm" className="bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 w-full h-8 py-1" onClick={() => updateItemQuantity(item, 1)}>
+                                        <Plus className="h-4 w-4 mr-1" /> Add
+                                    </Button>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-cyan-500 hover:bg-cyan-500/10" onClick={() => updateItemQuantity(item, quantity - 1)}>
+                                            <Minus className="h-4 w-4" />
+                                        </Button>
+                                        <span className="font-bold text-center w-4">{quantity}</span>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-cyan-500 hover:bg-cyan-500/10" onClick={() => updateItemQuantity(item, quantity + 1)}>
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                            </div>
+                        </div>
+                      )})}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+             )}
             </div>
-            <Button variant="outline" onClick={handleAddItem} size="sm">
-              <Plus className="mr-2 h-4 w-4" /> Add Item
-            </Button>
           </div>
 
-          <div className="flex justify-end font-bold text-xl">
-            <span>Total:</span>
-            <span className="ml-4">INR {total}</span>
+          {/* Right Column - Order Summary */}
+          <div className="md:col-span-2 bg-background p-6 rounded-lg flex flex-col h-[550px]">
+            <h3 className="text-lg font-semibold text-cyan-400 mb-4">Order Summary</h3>
+            <ScrollArea className="flex-grow pr-4 -mr-4">
+              {orderItems.length > 0 ? (
+                <div className="space-y-2">
+                  {orderItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-2 rounded-md bg-card">
+                      <div>
+                        {item.name} <span className="text-muted-foreground text-xs">x{item.quantity}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono text-sm text-green-400 flex justify-between w-20">
+                            <span>INR</span>
+                            <span>{item.price * item.quantity}</span>
+                        </div>
+                        <Button
+                          size="icon"
+                          className="h-6 w-6 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                          onClick={() => handleRemoveItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-muted-foreground py-16">
+                  <p>No items selected.</p>
+                </div>
+              )}
+            </ScrollArea>
+            <div className="mt-auto pt-4">
+              <Separator className="my-4 bg-white/10" />
+              <div className="flex justify-between items-center font-bold text-xl">
+                <span className="text-muted-foreground">Total:</span>
+                <div className="font-mono text-green-400 flex justify-between w-28">
+                    <span>INR</span>
+                    <span>{total}</span>
+                </div>
+              </div>
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitDisabled}
+                className="w-full mt-4 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Create Order'
+                )}
+              </Button>
+            </div>
           </div>
         </div>
-        <DialogFooter>
-          <DialogClose asChild>
-             <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitDisabled}
-          >
-            {isSubmitting && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            {isSubmitting ? 'Creating...' : 'Create Order'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

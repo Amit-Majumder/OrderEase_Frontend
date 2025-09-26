@@ -5,7 +5,7 @@ export interface MenuItem {
   description: string;
   price: number;
   image: string;
-  category: 'Starters' | 'Heavy Snacks' | 'Rice & Noodles' | 'Sides';
+  category: string;
 }
 
 // This interface is used when adding items to the cart on the frontend.
@@ -16,9 +16,16 @@ export interface CartItem extends MenuItem {
 // This interface now more closely matches the line items from the backend.
 export interface OrderItem {
     id: string; // was not present, but good for react keys
-    name: string; // mapped from 'sku'
-    quantity: number; // mapped from 'qty'
+    name: string; // mapped from 'sku' or 'name'
+    quantity: number; // mapped from 'qty' or 'active' + 'served'
     price: number;
+    served: boolean; // Is at least one item served?
+    active: number;
+    servedQty: number;
+    menuItem?: { // Can be populated from backend
+      _id: string;
+      name: string;
+    }
 }
 
 
@@ -34,4 +41,101 @@ export interface Order {
   timestamp: number; // mapped from 'createdAt'
   status: 'new' | 'paid' | 'done' | 'served'; // mapped from 'status'
   served: boolean; // mapped from 'served'
+}
+
+// Types for Inventory Page
+export interface Ingredient {
+    id: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    lowStockThreshold?: number;
+}
+
+// Type for Menu Management
+export interface RecipeItem {
+  ingredient: string; // Ingredient ID
+  qtyRequired: number;
+}
+
+// This is the populated version from the detailed GET /api/menu/:id call
+export interface PopulatedRecipeItem {
+  ingredient: {
+    _id: string;
+    name: string;
+    unit: string;
+    quantity: number;
+  },
+  qtyRequired: number;
+}
+
+export interface FullMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  description: string;
+  imageUrl: string;
+  recipe: RecipeItem[];
+}
+
+
+// --- DASHBOARD TYPES ---
+export interface DashboardKpis {
+  todaysSales: number;
+  yesterdaysSales: number;
+  orderCounts: {
+    total: number;
+    completed: number;
+    pending: number;
+    cancelled: number;
+  };
+  averageOrderValue: number;
+  lowStockItemCount: number;
+  peakHour: string;
+}
+
+export interface DashboardData {
+    kpis: DashboardKpis;
+    salesTodayByHour: { hour: string; revenue: number }[];
+    salesYesterdayByHour: { hour: string; revenue: number }[];
+    lowStockItems: { name: string; quantity: number; unit: string }[];
+}
+
+
+// --- SALES REPORT TYPES ---
+export interface SalesReportSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrderValue: number;
+}
+
+export interface SalesTrendDataPoint {
+  date: string;
+  revenue: number;
+  orderCount: number;
+}
+
+export interface SalesReportOrder {
+  id: string;
+  token: string;
+  date: string;
+  customerName: string;
+  total: number;
+  status: 'new' | 'paid' | 'done' | 'served';
+}
+
+// This is the new comprehensive type for the entire sales report API response.
+export interface FullSalesReportData {
+  summary: SalesReportSummary;
+  salesTrend: SalesTrendDataPoint[];
+  itemAnalysis: {
+    topSellingItems: { name: string; quantity: number; revenue: number }[];
+  };
+  customerInsights: {
+    newVsReturning: { new: number; returning: number };
+    highSpendersCount: number;
+  };
+  paymentMethods: { method: string; count: number }[];
+  detailedOrders: SalesReportOrder[];
 }

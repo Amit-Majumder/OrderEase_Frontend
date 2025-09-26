@@ -11,7 +11,7 @@
  */
 
 import type { CartItem, Order, MenuItem } from '@/lib/types';
-import axios from 'axios';
+import { axiosInstance } from '@/lib/axios-instance';
 
 // The input type for the createOrder function.
 export interface CreateOrderInput {
@@ -47,7 +47,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
  */
 export async function getOrders(): Promise<Order[]> {
     try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders`);
+        const res = await axiosInstance.get(`/api/orders`);
         return res.data.orders as Order[];
     } catch (err) {
         console.error("Error fetching orders:", err);
@@ -62,7 +62,7 @@ export async function getOrders(): Promise<Order[]> {
  */
 export async function getOrder(token: string): Promise<Order | null> {
     try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${token}`);
+        const res = await axiosInstance.get(`/api/orders/${token}`);
         return res.data.order as Order;
     } catch (err) {
         console.error(`Error fetching order ${token}:`, err);

@@ -1,0 +1,233 @@
+
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Loader2, AlertTriangle, PackageOpen, Plus } from 'lucide-react';
+import type { FullMenuItem } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import Image from 'next/image';
+import { EditMenuItemDialog } from '@/components/menu-management/EditMenuItemDialog';
+import { AddMenuItemDialog } from '@/components/menu-management/AddMenuItemDialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useOrder } from '@/context/OrderContext';
+import { axiosInstance } from '@/lib/axios-instance';
+
+// Helper function to check for a valid URL
+const isValidUrl = (url: string | undefined): boolean => {
+  if (!url) return false;
+  try {
+    new URL(url);
+    return url.startsWith('http://') || url.startsWith('https://');
+  } catch (e) {
+    return false;
+  }
+};
+
+
+// A component to handle image errors gracefully
+function MenuItemImage({ src, alt }: { src: string; alt: string }) {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [hasError, setHasError] = useState(!isValidUrl(src));
+
+  useEffect(() => {
+    const valid = isValidUrl(src);
+    setHasError(!valid);
+    if (valid) {
+      setImgSrc(src);
+    }
+  }, [src]);
+
+  const handleNextImageError = () => {
+    if (!hasError) {
+      setHasError(true);
+    }
+  };
+  
+  if (hasError) {
+    return (
+      <div className="w-full h-full bg-muted flex items-center justify-center">
+        <span className="text-xs text-muted-foreground text-center p-2">
+          Invalid Image
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt}
+      fill
+      className="object-cover"
+      onError={handleNextImageError}
+    />
+  );
+}
+
+
+export default function MenuManagementPage() {
+  const [menuItems, setMenuItems] = useState<FullMenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { isAddMenuItemDialogOpen, setIsAddMenuItemDialogOpen } = useOrder();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState<FullMenuItem | null>(null);
+  
+  const [categories, setCategories] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const fetchMenuItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await axiosInstance.get(
+        `/api/menu`
+      );
+      if (response.data && Array.isArray(response.data)) {
+        const formattedMenuItems: FullMenuItem[] = response.data.map(
+          (item: any) => {
+             let imageUrl = item.imageUrl || '';
+             // If it's not a full URL, assume it's a Pixabay ID and construct the URL
+             if (imageUrl && !imageUrl.startsWith('http')) {
+                imageUrl = `https://cdn.pixabay.com/photo/${imageUrl}.jpg`;
+             }
+             return {
+                id: item._id,
+                name: item.name,
+                price: item.price,
+                category: item.category,
+                description: item.description,
+                imageUrl: imageUrl,
+                recipe: item.recipe,
+            };
+          }
+        );
+        
+        const sortedMenuItems = formattedMenuItems.sort((a, b) => a.name.localeCompare(b.name));
+        
+        setMenuItems(sortedMenuItems);
+        const uniqueCategories = Array.from(new Set(sortedMenuItems.map(item => item.category)));
+        uniqueCategories.sort();
+        setCategories(['All', ...uniqueCategories]);
+      } else {
+        throw new Error('Invalid data format from API');
+      }
+    } catch (err) {
+      console.error('Failed to fetch menu items:', err);
+      setError('Could not load the menu. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMenuItems();
+  }, [fetchMenuItems]);
+
+  const handleMenuItemUpdated = () => {
+    fetchMenuItems();
+  };
+  
+  const handleMenuItemDeleted = () => {
+    fetchMenuItems();
+  };
+
+  const handleMenuItemAdded = () => {
+    fetchMenuItems();
+  }
+
+  const handleEditClick = (item: FullMenuItem) => {
+    setSelectedMenuItem(item);
+    setIsEditDialogOpen(true);
+  };
+  
+  const filteredMenuItems = activeCategory === 'All'
+    ? menuItems
+    : menuItems.filter(item => item.category === activeCategory);
+
+  return (
+    <div className="space-y-8">
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[calc(100vh-300px)]">
+          <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="text-center py-16 bg-destructive/10 text-destructive rounded-lg flex flex-col items-center justify-center">
+          <AlertTriangle className="h-12 w-12 mb-4" />
+          <p className="text-lg">{error}</p>
+        </div>
+      ) : (
+        <div>
+          {menuItems.length > 0 ? (
+            <>
+              <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mb-6">
+                <TabsList>
+                  {categories.map(category => (
+                    <TabsTrigger key={category} value={category}>
+                      {category}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+
+              {filteredMenuItems.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-4">
+                      {filteredMenuItems.map((item) => (
+                           <Card 
+                                key={item.id} 
+                                className="group bg-card/70 border-white/10 shadow-lg flex flex-col overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1"
+                                onClick={() => handleEditClick(item)}
+                            >
+                              <div className="aspect-video relative">
+                                  <MenuItemImage
+                                      src={item.imageUrl}
+                                      alt={item.name}
+                                  />
+                              </div>
+                              <CardHeader className="p-4 pb-2 flex-grow">
+                                  <CardTitle className="text-lg text-white truncate transition-colors group-hover:text-cyan-400">{item.name}</CardTitle>
+                                  <p className="text-sm text-muted-foreground">{item.category}</p>
+                              </CardHeader>
+                              <CardContent className="p-4 pt-0 mt-auto">
+                                  <p className="text-xl font-bold text-green-400">INR {item.price}</p>
+                              </CardContent>
+                          </Card>
+                      ))}
+                  </div>
+              ) : (
+                  <div className="text-center py-16 bg-card rounded-lg border-2 border-dashed flex flex-col items-center justify-center">
+                      <PackageOpen className="h-16 w-16 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No menu items found for this category.</p>
+                  </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-16 bg-card rounded-lg border-2 border-dashed flex flex-col items-center justify-center">
+              <PackageOpen className="h-16 w-16 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No menu items found.</p>
+              <p className="text-sm text-muted-foreground mt-2">Click "+ Add Item" to get started.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedMenuItem && (
+        <EditMenuItemDialog
+            isOpen={isEditDialogOpen}
+            setIsOpen={setIsEditDialogOpen}
+            onMenuItemUpdated={handleMenuItemUpdated}
+            onMenuItemDeleted={handleMenuItemDeleted}
+            menuItem={selectedMenuItem}
+        />
+      )}
+      
+      <AddMenuItemDialog
+        isOpen={isAddMenuItemDialogOpen}
+        setIsOpen={setIsAddMenuItemDialogOpen}
+        onMenuItemAdded={handleMenuItemAdded}
+      />
+
+    </div>
+  );
+}

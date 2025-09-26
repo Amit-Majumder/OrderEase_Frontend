@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import { axiosInstance } from '@/lib/axios-instance';
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 const CUSTOMER_NAME_KEY = 'customerName';
@@ -59,18 +59,18 @@ export default function CartPage() {
     try {
       const payload = {
         items: cart.map((item) => ({
-          sku: item.name.toLowerCase().replace(/ /g, '-'),
+          menuItem: item.id,
           qty: item.quantity,
           price: item.price,
         })),
         customer: {
           name: customerName,
-          phone: `+91${customerPhone}`,
+          phone: customerPhone,
         },
       };
 
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders`,
+      const res = await axiosInstance.post(
+        `/api/orders`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       );
@@ -99,18 +99,21 @@ export default function CartPage() {
     try {
        const payload = {
         items: cart.map(item => ({
-          sku: item.name.toLowerCase().replace(/ /g, '-'),
-          qty: item.quantity,
+          menuItem: item.id,
+          status: {
+            active: item.quantity,
+            served: 0
+          },
           price: item.price
         })),
         customer: {
           name: customerName,
-          phone: `+91${customerPhone}`,
+          phone: customerPhone,
         },
       };
 
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orderv2`,
+      const res = await axiosInstance.post(
+        `/api/orderv2`,
         payload
       );
 
@@ -131,7 +134,7 @@ export default function CartPage() {
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^[a-zA-Z\s]*$/.test(value)) {
+    if (/^[a-zA-Z]*$/.test(value) && value.length <= 15) {
       setCustomerName(value);
     }
   };
@@ -234,7 +237,7 @@ export default function CartPage() {
                       id="customerName"
                       value={customerName}
                       onChange={handleNameChange}
-                      placeholder="e.g. John D."
+                      placeholder="e.g. John Doe"
                     />
                   </div>
                   <div className="space-y-2">
@@ -257,10 +260,7 @@ export default function CartPage() {
                   disabled={isFormInvalid || isSubmitting}
                 >
                   {isSubmitting && submitAction === 'payNow' ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     'Pay Now'
                   )}
@@ -273,10 +273,7 @@ export default function CartPage() {
                   disabled={isFormInvalid || isSubmitting}
                 >
                   {isSubmitting && submitAction === 'payLater' ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Placing Order...
-                    </>
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     'Pay Later'
                   )}

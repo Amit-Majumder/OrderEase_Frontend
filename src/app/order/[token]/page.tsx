@@ -14,9 +14,9 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { useOrder } from '@/context/OrderContext';
-import axios from 'axios';
 import type { Order } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
+import { axiosInstance } from '@/lib/axios-instance';
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 const CUSTOMER_NAME_KEY = 'customerName';
@@ -29,6 +29,19 @@ export default function OrderSuccessPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Prevent user from going back
+    window.history.pushState(null, '', window.location.href);
+    const handleBackButton = () => {
+      window.history.pushState(null, '', window.location.href);
+    };
+    window.addEventListener('popstate', handleBackButton);
+
+    return () => {
+      window.removeEventListener('popstate', handleBackButton);
+    };
+  }, []);
+
+  useEffect(() => {
     async function fetchOrderDetails() {
       if (typeof uniqueId !== 'string') {
         setError('Invalid order ID.');
@@ -38,8 +51,8 @@ export default function OrderSuccessPage() {
 
       try {
         setLoading(true);
-        const res = await axios.get(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/detail?id=${uniqueId}`
+        const res = await axiosInstance.get(
+          `/api/orders/detail?id=${uniqueId}`
         );
         
         const backendOrder = res.data;
@@ -95,7 +108,6 @@ export default function OrderSuccessPage() {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 p-4">
         <Loader2 className="h-12 w-12 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground">Confirming your order...</p>
       </div>
     );
   }

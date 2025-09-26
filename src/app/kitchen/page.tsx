@@ -2,95 +2,87 @@
 'use client';
 
 import { OrderCard } from '@/components/OrderCard';
-import { ChefHat, Loader2, Plus } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import type { Order } from '@/lib/types';
+import { Loader2 } from 'lucide-react';
 import { useOrder } from '@/context/OrderContext';
-import { Button } from '@/components/ui/button';
-import { CreateOrderDialog } from '@/components/CreateOrderDialog';
-import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function KitchenPage() {
-  const { kitchenOrders, setKitchenOrders, loading, error, fetchKitchenOrders } = useOrder();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  
-  const newOrders = kitchenOrders.filter((order) => order.status === 'paid' || order.status === 'new' || order.status === 'served');
-  const completedOrders = kitchenOrders.filter((order) => order.status === 'done');
+  const { kitchenOrders, loading, error } = useOrder();
+
+  const newOrders = kitchenOrders
+    .filter(
+      (order) =>
+        order.status === 'paid' ||
+        order.status === 'new' ||
+        order.status === 'served'
+    )
+    .sort((a, b) => b.timestamp - a.timestamp);
+  const completedOrders = kitchenOrders.filter(
+    (order) => order.status === 'done'
+  );
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        <p className="ml-4 text-muted-foreground">Loading Kitchen...</p>
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
       </div>
     );
   }
-  
-  const handleOrderCreated = () => {
-    // Re-fetch orders to show the new one
-    fetchKitchenOrders();
-  };
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      <header className="bg-background shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto p-4 flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-default">
-            <ChefHat className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold font-headline">Kitchen</h1>
-          </div>
-          <CreateOrderDialog
-            isOpen={isCreateDialogOpen}
-            setIsOpen={setIsCreateDialogOpen}
-            onOrderCreated={handleOrderCreated}
-          >
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Order
-            </Button>
-          </CreateOrderDialog>
+    <>
+      {error && (
+        <div className="text-center py-16 bg-destructive/10 text-destructive rounded-lg mb-8">
+          <p>{error}</p>
         </div>
-      </header>
+      )}
 
-      <main className="container mx-auto p-4 md:p-8">
-         {error && (
-            <div className="text-center py-16 bg-destructive/10 text-destructive rounded-lg mb-8">
-                 <p>{error}</p>
-            </div>
-        )}
-
-        <section>
-          <h2 className="text-2xl font-semibold font-headline text-primary mb-4">New Orders ({newOrders.length})</h2>
-          {newOrders.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {newOrders.map((order) => (
-                <OrderCard key={order.id} order={order} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-background rounded-lg">
-              <p className="text-muted-foreground">No new orders at the moment.</p>
-            </div>
-          )}
-        </section>
-
-        <Separator className="my-12" />
-
-        <section>
-          <h2 className="text-2xl font-semibold font-headline text-muted-foreground mb-4">Completed Orders ({completedOrders.length})</h2>
-          {completedOrders.length > 0 ? (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {completedOrders.map((order) => (
-                <OrderCard key={order.id} order={order} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-background rounded-lg">
-              <p className="text-muted-foreground">No orders have been completed yet.</p>
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
+      <Tabs defaultValue="new-orders">
+        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+          <TabsTrigger value="new-orders">
+            New Orders ({newOrders.length})
+          </TabsTrigger>
+          <TabsTrigger value="completed-orders">
+            Completed Orders ({completedOrders.length})
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="new-orders">
+          <div className="mt-6">
+            {newOrders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {newOrders.map((order) => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-card rounded-lg mt-8">
+                <p className="text-muted-foreground">
+                  No new orders at the moment.
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent value="completed-orders">
+          <div className="mt-6">
+            {completedOrders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {completedOrders.map((order) => (
+                  <div key={order.id} className="opacity-60">
+                    <OrderCard order={order} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-card rounded-lg mt-8">
+                <p className="text-muted-foreground">
+                  No completed orders at the moment.
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </>
   );
 }

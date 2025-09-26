@@ -4,8 +4,33 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="21f0fd4e-c35e-46ee-a3c6-c1cf284021db" name="Changes" comment="">
+    <list default="true" id="89ebbafe-e1fe-4597-a866-7f4aa879193d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ai/flows/order-flow.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/ai/flows/order-flow.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/globals.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/kitchen/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/kitchen/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/menu/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/menu/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/my-cart/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/my-cart/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/my-orders/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/my-orders/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/order/[token]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/order/[token]/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/CreateOrderDialog.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/CreateOrderDialog.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/KitchenHeader.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/KitchenHeader.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/OrderCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/OrderCard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/badge.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/badge.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/chart.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/chart.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/dialog.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/dialog.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/sheet.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/sheet.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/tabs.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/tabs.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/textarea.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/textarea.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/context/OrderContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/context/OrderContext.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tailwind.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tailwind.config.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -16,9 +41,9 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="ProjectColorInfo">{
-  &quot;associatedIndex&quot;: 1
+  &quot;associatedIndex&quot;: 2
 }</component>
-  <component name="ProjectId" id="321GeGt2ZEhO0UmYxGuX7zSY6Yc" />
+  <component name="ProjectId" id="336ypfZB8T03hqx5ZD5TuwurUVs" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -30,35 +55,36 @@
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/Amit/Desktop/Files/Amit/Something Big In The Making/OrderEase_Production/OrderEase_Frontend&quot;
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/Amit/Downloads/download&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;project.propVCSSupport.DirectoryMappings&quot;
   }
 }</component>
-  <component name="RecentsManager">
-    <key name="MoveFile.RECENT_KEYS">
-      <recent name="C:\Users\Amit\Desktop\Files\Amit\Something Big In The Making\OrderEase_Production\OrderEase_Frontend\public" />
-    </key>
-  </component>
   <component name="RunManager">
     <configuration default="true" type="JetRunConfigurationType">
-      <module name="OrderEaseV2-pg-connect" />
+      <module name="OrderEase_Frontend" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
     </configuration>
     <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
-      <module name="OrderEaseV2-pg-connect" />
+      <module name="OrderEase_Frontend" />
       <option name="filePath" />
       <method v="2" />
     </configuration>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="21f0fd4e-c35e-46ee-a3c6-c1cf284021db" name="Changes" comment="" />
-      <created>1756580759165</created>
+      <changelist id="89ebbafe-e1fe-4597-a866-7f4aa879193d" name="Changes" comment="" />
+      <created>1758652000635</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1756580759165</updated>
+      <updated>1758652000635</updated>
     </task>
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <ignored-roots>
+      <path value="$PROJECT_DIR$/.." />
+    </ignored-roots>
   </component>
 </project>

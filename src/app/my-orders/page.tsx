@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -25,7 +24,6 @@ import { Label } from '@/components/ui/label';
 import { useSearchParams } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { useOrder } from '@/context/OrderContext';
-import { useToast } from '@/hooks/use-toast';
 
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
@@ -158,7 +156,7 @@ function MyOrdersView() {
             </div>
             <Button onClick={handleFindOrders} disabled={myOrdersLoading} className="w-full sm:w-auto">
               {myOrdersLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Search className="mr-2 h-4 w-4" />
               )}
@@ -174,7 +172,6 @@ function MyOrdersView() {
           {myOrdersLoading && (
             <div className="flex justify-center items-center py-16">
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <p className="ml-4 text-muted-foreground">Searching for your orders...</p>
             </div>
           )}
           
@@ -207,7 +204,6 @@ export default function MyOrdersPage() {
     <Suspense fallback={
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        <p className="ml-4 text-muted-foreground">Loading Your Orders...</p>
       </div>
     }>
       <MyOrdersView />

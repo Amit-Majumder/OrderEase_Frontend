@@ -2,9 +2,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { CartItem, MenuItem, Order, OrderItem } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
-import axios from 'axios';
+import type { CartItem, MenuItem, Order, OrderItem, FullMenuItem, PopulatedRecipeItem } from '@/lib/types';
+import { axiosInstance } from '@/lib/axios-instance';
+import { usePathname } from 'next/navigation';
 
 interface OrderContextType {
   cart: CartItem[];
@@ -23,15 +23,55 @@ interface OrderContextType {
   markAsPaid: (id: string) => Promise<boolean>;
   completeOrder: (id: string) => Promise<boolean>;
   cancelOrder: (id: string) => Promise<boolean>;
-  updateOrderItems: (orderId: string, customer: { name: string, phone: string }, items: { sku: string, qty: number, price: number }[]) => Promise<boolean>;
+  updateOrderItems: (orderId: string, customer: { name: string, phone: string }, items: { menuItem: string, qty: number, price: number, served: boolean, initialQty: number }[]) => Promise<boolean>;
+  deleteIngredient: (ingredientId: string) => Promise<boolean>;
+  updateMenuItem: (menuId: string, data: Partial<FullMenuItem>) => Promise<boolean>;
+  deleteMenuItem: (menuId: string) => Promise<boolean>;
   cartTotal: number;
   cartCount: number;
   inProgressOrderCount: number;
+  isAddMenuItemDialogOpen: boolean;
+  setIsAddMenuItemDialogOpen: (isOpen: boolean) => void;
+  isAddIngredientDialogOpen: boolean;
+  setIsAddIngredientDialogOpen: (isOpen: boolean) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
+
+// Helper function to map backend order structure to frontend Order type
+const mapBackendOrderToFrontend = (order: any): Order => {
+  return {
+    id: order._id,
+    token: order.orderToken,
+    customerName: order.customer?.name || '',
+    customerPhone: order.customer?.phone || '',
+    total: order.amount,
+    amountDue: order.amountDue,
+    status: order.status === 'created' ? 'new' : order.status,
+    timestamp: new Date(order.createdAt).getTime(),
+    items: order.lineItems.map((item: any) => {
+      const activeQty = item.status?.active ?? item.active ?? 0;
+      const servedQty = item.status?.served ?? item.served ?? 0;
+      const quantity = activeQty + servedQty;
+      const isServed = servedQty > 0;
+      
+      return {
+        id: item._id || item.menuItem?._id || item.name || 'unknown-id',
+        name: item.name || item.menuItem?.name || item.sku || 'Unknown Item',
+        quantity: quantity,
+        price: item.price,
+        served: isServed,
+        active: activeQty,
+        servedQty: servedQty,
+        menuItem: item.menuItem,
+      };
+    }),
+    served: order.served || false,
+  };
+};
+
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -40,35 +80,21 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOrdersLoading, setMyOrdersLoading] = useState(false);
-  const {toast} = useToast();
+  const [isAddMenuItemDialogOpen, setIsAddMenuItemDialogOpen] = useState(false);
+  const [isAddIngredientDialogOpen, setIsAddIngredientDialogOpen] = useState(false);
+  const pathname = usePathname();
 
 
   const fetchKitchenOrders = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/today`
+      const res = await axiosInstance.get(
+        `/api/kitchen/today`
       );
       const backendOrders = res.data.orders || [];
 
-      const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
-        id: order._id,
-        token: order.orderToken,
-        customerName: order.customer?.name || '',
-        customerPhone: order.customer?.phone || '',
-        total: order.amount,
-        amountDue: order.amountDue,
-        status: order.status === 'created' ? 'new' : order.status,
-        timestamp: new Date(order.createdAt).getTime(),
-        items: order.lineItems.map((item: any) => ({
-          id: item._id,
-          name: item.sku,
-          quantity: item.qty,
-          price: item.price,
-        })),
-        served: order.served || false,
-      }));
+      const fetchedOrders: Order[] = backendOrders.map(mapBackendOrderToFrontend);
 
       setKitchenOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
     } catch (err) {
@@ -83,27 +109,11 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     if (!phone || phone.length !== 10) return;
     setMyOrdersLoading(true);
     try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/myorder?phone=${phone}`
+      const res = await axiosInstance.get(
+        `/api/myorder?phone=${phone}`
       );
       const backendOrders = res.data.orders || [];
-      const fetchedOrders: Order[] = backendOrders.map((order: any) => ({
-        token: order.orderToken,
-        id: order._id,
-        customerName: order.customer?.name || '',
-        customerPhone: order.customer?.phone || '',
-        total: order.amount,
-        amountDue: order.amountDue,
-        status: order.status === 'created' ? 'new' : order.status,
-        timestamp: new Date(order.createdAt).getTime(),
-        items: order.lineItems.map((item: any) => ({
-          id: item._id,
-          name: item.sku,
-          quantity: item.qty,
-          price: item.price,
-        })),
-        served: order.served || false,
-      }));
+      const fetchedOrders: Order[] = backendOrders.map(mapBackendOrderToFrontend);
       setMyOrders(fetchedOrders.sort((a, b) => b.timestamp - a.timestamp));
     } catch (err) {
       console.error('Error fetching my orders:', err);
@@ -114,12 +124,22 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    fetchKitchenOrders();
+    const isApiCallBlocked =
+      pathname === '/kitchen/login' ||
+      pathname === '/kitchen/register' ||
+      pathname === '/';
+
+    if (!isApiCallBlocked) {
+      fetchKitchenOrders();
+    } else {
+      setLoading(false);
+    }
+
     const cachedPhone = localStorage.getItem(CUSTOMER_PHONE_KEY);
     if (cachedPhone) {
-        fetchMyOrders(cachedPhone);
+      fetchMyOrders(cachedPhone);
     }
-  }, [fetchKitchenOrders, fetchMyOrders]);
+  }, [fetchKitchenOrders, fetchMyOrders, pathname]);
 
 
   const addToCart = (item: MenuItem) => {
@@ -158,27 +178,20 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
 
  const completeOrder = async (id: string): Promise<boolean> => {
     try {
-      const res = await axios.patch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
+      const res = await axiosInstance.patch(
+        `/api/kitchen/status/${id}`,
         { status: 'served' }
       );
 
-      if (res.status === 200) {
-        const updateOrderState = (prevOrders: Order[]) =>
-          prevOrders.map((order) => {
-            if (order.id === id) {
-              const updatedOrder = { ...order, served: true };
-              // If also paid, mark as done
-              if (updatedOrder.status === 'paid') {
-                updatedOrder.status = 'done';
-              }
-              return updatedOrder;
-            }
-            return order;
-          }).sort((a, b) => b.timestamp - a.timestamp);
+      if (res.status === 200 && res.data.order) {
+        const updatedOrder = mapBackendOrderToFrontend(res.data.order);
+        
+        const updateState = (prevOrders: Order[]) => 
+            prevOrders.map(o => o.id === updatedOrder.id ? updatedOrder : o)
+                      .sort((a, b) => b.timestamp - a.timestamp);
 
-        setKitchenOrders(updateOrderState);
-        setMyOrders(updateOrderState);
+        setKitchenOrders(updateState);
+        setMyOrders(updateState);
         
         return true;
       } else {
@@ -192,27 +205,20 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
 
   const markAsPaid = async (id: string): Promise<boolean> => {
     try {
-      const res = await axios.patch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kitchen/status/${id}`,
+      const res = await axiosInstance.patch(
+        `/api/kitchen/status/${id}`,
         { status: 'paid' }
       );
 
-      if (res.status === 200) {
-        const updateOrderState = (prevOrders: Order[]) =>
-          prevOrders.map((order) => {
-            if (order.id === id) {
-               const updatedOrder = { ...order, status: 'paid' as const };
-               // If also served, mark as done
-               if (updatedOrder.served) {
-                  updatedOrder.status = 'done';
-               }
-               return updatedOrder;
-            }
-            return order;
-          }).sort((a,b) => b.timestamp - a.timestamp);
+      if (res.status === 200 && res.data.order) {
+        const updatedOrder = mapBackendOrderToFrontend(res.data.order);
+        
+        const updateState = (prevOrders: Order[]) => 
+            prevOrders.map(o => o.id === updatedOrder.id ? updatedOrder : o)
+                      .sort((a,b) => b.timestamp - a.timestamp);
 
-        setKitchenOrders(updateOrderState);
-        setMyOrders(updateOrderState);
+        setKitchenOrders(updateState);
+        setMyOrders(updateState);
         
         return true;
       } else {
@@ -220,18 +226,33 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error(`Failed to mark order ${id} as paid:`, error);
+      // Removed toast
       return false;
     }
   };
   
-  const updateOrderItems = async (orderId: string, customer: { name: string, phone: string }, items: { sku: string, qty: number, price: number }[]): Promise<boolean> => {
+  const updateOrderItems = async (orderId: string, customer: { name: string, phone: string }, items: { menuItem: string, qty: number, price: number, served: boolean, initialQty: number }[]): Promise<boolean> => {
     try {
+       const itemsPayload = items.map(item => {
+        const servedQty = item.served ? item.initialQty : 0;
+        const activeQty = item.qty - servedQty;
+        return {
+          menuItem: item.menuItem,
+          price: item.price,
+          status: {
+            active: activeQty,
+            served: servedQty,
+          }
+        }
+      });
+
       const payload = {
-        items,
+        items: itemsPayload,
         customer,
       };
-      const res = await axios.put(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${orderId}`,
+      
+      const res = await axiosInstance.patch(
+        `/api/orders/${orderId}`,
         payload
       );
 
@@ -244,19 +265,15 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error(`Failed to update order ${orderId}:`, error);
-       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Something went wrong while updating the order.',
-      });
+       // Removed toast
       return false;
     }
   };
 
   const cancelOrder = async (orderId: string): Promise<boolean> => {
     try {
-      const res = await axios.delete(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${orderId}`
+      const res = await axiosInstance.delete(
+        `/api/orders/${orderId}`
       );
 
       if (res.status === 200) {
@@ -272,11 +289,48 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error(`Failed to cancel order ${orderId}:`, error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Something went wrong while cancelling the order.',
-      });
+      // Removed toast
+      return false;
+    }
+  };
+
+  const deleteIngredient = async (ingredientId: string): Promise<boolean> => {
+    try {
+      const response = await axiosInstance.delete(`/api/ingredients/${ingredientId}`);
+       if (response.status === 409) {
+          return false;
+       }
+      return true;
+    } catch (error: any) {
+        if(error.response && error.response.status === 409) {
+            console.error(`Ingredient ${ingredientId} is in use.`);
+            return false;
+        }
+      console.error(`Failed to delete ingredient ${ingredientId}:`, error);
+      return false;
+    }
+  };
+
+  const updateMenuItem = async (menuId: string, data: Partial<FullMenuItem>): Promise<boolean> => {
+    try {
+      await axiosInstance.patch(`/api/menu/${menuId}`, data);
+      // Removed toast
+      return true;
+    } catch (error) {
+      console.error(`Failed to update menu item ${menuId}:`, error);
+      // Removed toast
+      return false;
+    }
+  };
+
+  const deleteMenuItem = async (menuId: string): Promise<boolean> => {
+    try {
+      await axiosInstance.delete(`/api/menu/${menuId}`);
+      // Removed toast
+      return true;
+    } catch (error) {
+      console.error(`Failed to delete menu item ${menuId}:`, error);
+      // Removed toast
       return false;
     }
   };
@@ -302,9 +356,16 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         markAsPaid,
         cancelOrder,
         updateOrderItems,
+        deleteIngredient,
+        updateMenuItem,
+        deleteMenuItem,
         cartTotal,
         cartCount,
         inProgressOrderCount,
+        isAddMenuItemDialogOpen,
+        setIsAddMenuItemDialogOpen,
+        isAddIngredientDialogOpen,
+        setIsAddIngredientDialogOpen,
       }}
     >
       {children}
