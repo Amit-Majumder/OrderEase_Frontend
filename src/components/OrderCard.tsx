@@ -131,12 +131,12 @@ export function OrderCard({ order }: OrderCardProps) {
               <div className="flex justify-between items-center mt-auto">
                 <div className="flex gap-2 items-center min-h-[28px]">
                   {order.status === 'paid' && (
-                    <Badge className="bg-purple-500/20 text-purple-300">
+                    <Badge className="bg-yellow-500/20 text-yellow-300">
                       Paid
                     </Badge>
                   )}
                   {order.served && (
-                    <Badge className="bg-purple-500/20 text-purple-300">
+                    <Badge className="bg-yellow-500/20 text-yellow-300">
                       Served
                     </Badge>
                   )}
@@ -149,7 +149,7 @@ export function OrderCard({ order }: OrderCardProps) {
           <CardFooter className="flex gap-2 pt-0 mt-auto">
             {isCompleted ? (
               <div className="flex w-full justify-between items-center">
-                <Badge className="bg-purple-500/20 text-purple-300">
+                <Badge className="bg-green-500/20 text-green-300">
                   Completed
                 </Badge>
                 <div className="text-white/60 text-sm">{time}</div>
@@ -217,7 +217,10 @@ export function OrderCard({ order }: OrderCardProps) {
                 {order.items.map((item, index) => (
                   <div
                     key={`${order.id}-${item.id}-${index}`}
-                    className="flex justify-between items-center bg-background/50 p-3 rounded-md"
+                    className={cn(
+                        "flex justify-between items-center bg-background/50 p-3 rounded-md",
+                        item.served && "opacity-50"
+                    )}
                   >
                     <p className="text-white/90">
                       {item.name} x {item.quantity}

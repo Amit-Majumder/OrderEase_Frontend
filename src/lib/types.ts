@@ -79,6 +79,39 @@ export interface FullMenuItem {
   recipe: RecipeItem[];
 }
 
+// Types for Roles / Staff Management
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'manager' | 'chef' | 'waiter';
+}
+
+export interface AddStaffInput {
+  name: string;
+  email: string;
+  password?: string;
+  role: 'owner' | 'manager' | 'chef' | 'waiter';
+}
+
+// Types for Branch Management
+export interface Branch {
+  id: string;
+  name: string;
+  pin: string;
+  phone: string;
+  address: string;
+}
+
+export interface AddBranchInput {
+    name: string;
+    PIN: string;
+    phone: string;
+    address: string;
+}
+
+export interface UpdateBranchInput extends AddBranchInput {}
+
 
 // --- DASHBOARD TYPES ---
 export interface DashboardKpis {

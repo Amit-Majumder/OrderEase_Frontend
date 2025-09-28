@@ -27,8 +27,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
-import axios from 'axios';
+import { cn, getBranchId } from '@/lib/utils';
+import { axiosInstance } from '@/lib/axios-instance';
 
 interface UpdateOrderDialogProps {
   children: React.ReactNode;
@@ -82,7 +82,11 @@ export function UpdateOrderDialog({
         setLoadingMenu(true);
         setMenuError(null);
         try {
-          const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/menu`);
+          const branchId = getBranchId();
+          if (!branchId) {
+            throw new Error("Branch ID not found. Please log in again.");
+          }
+          const response = await axiosInstance.get(`/api/menu?branch=${branchId}`);
           if (response.data && Array.isArray(response.data)) {
             const formattedMenuItems: MenuItem[] = response.data.map((item: any) => ({
               id: item._id,
@@ -106,9 +110,9 @@ export function UpdateOrderDialog({
           } else {
             throw new Error("Invalid data format from API");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Failed to fetch menu:", err);
-          setMenuError("Could not load the menu. Please try again.");
+          setMenuError(err.message || "Could not load the menu. Please try again.");
         } finally {
           setLoadingMenu(false);
         }
@@ -352,7 +356,7 @@ export function UpdateOrderDialog({
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                            <Button
-                                className="w-full bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                                className="w-full bg-red-500/20 text-red-300 hover:bg-red-500/30"
                                 disabled={isAnyItemServed}
                             >
                                 Cancel Order
@@ -369,7 +373,7 @@ export function UpdateOrderDialog({
                         <AlertDialogFooter>
                             <AlertDialogCancel className={cn(buttonVariants({ variant: 'outline' }), "bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border-0 hover:text-cyan-300")}>No, Go Back</AlertDialogCancel>
                             <AlertDialogAction
-                            className="bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                            className="bg-red-500/20 text-red-300 hover:bg-red-500/30"
                             onClick={handleCancelOrder}
                             >
                             Yes, Cancel Order

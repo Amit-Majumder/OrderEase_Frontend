@@ -10,6 +10,7 @@ import { EditIngredientDialog } from '@/components/inventory/EditIngredientDialo
 import { AddIngredientDialog } from '@/components/inventory/AddIngredientDialog';
 import { useOrder } from '@/context/OrderContext';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<Ingredient[]>([]);
@@ -22,8 +23,12 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     try {
       setLoading(true);
+      const branchId = getBranchId();
+      if (!branchId) {
+        throw new Error("Branch ID not found. Please log in again.");
+      }
       const response = await axiosInstance.get(
-        `/api/ingredients`
+        `/api/ingredients?branch=${branchId}`
       );
       if (response.data && Array.isArray(response.data)) {
         const formattedInventory: Ingredient[] = response.data.map(
@@ -42,9 +47,9 @@ export default function InventoryPage() {
       } else {
         throw new Error('Invalid data format from API');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch inventory:', err);
-      setError('Could not load the inventory. Please try again later.');
+      setError(err.message || 'Could not load the inventory. Please try again later.');
     } finally {
       setLoading(false);
     }

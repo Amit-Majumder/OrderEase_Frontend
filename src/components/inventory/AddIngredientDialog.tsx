@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 
 interface AddIngredientDialogProps {
@@ -74,6 +75,10 @@ export function AddIngredientDialog({
 
   const onSubmit = async (data: FormValues) => {
     try {
+        const branchId = getBranchId();
+        if (!branchId) {
+            throw new Error("Branch ID not found. Please log in again.");
+        }
         const payload = {
             ingredients: [{
                 ...data,
@@ -82,7 +87,7 @@ export function AddIngredientDialog({
             }]
         };
       await axiosInstance.post(
-        `/api/ingredients`,
+        `/api/ingredients?branch=${branchId}`,
         payload
       );
       onIngredientAdded();

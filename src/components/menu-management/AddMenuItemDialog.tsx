@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ScrollArea } from '../ui/scroll-area';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 interface AddMenuItemDialogProps {
   children?: React.ReactNode;
@@ -86,7 +87,11 @@ export function AddMenuItemDialog({
     async function fetchIngredients() {
       if (isOpen) {
         try {
-          const response = await axiosInstance.get(`/api/ingredients`);
+          const branchId = getBranchId();
+          if (!branchId) {
+            throw new Error("Branch ID not found.");
+          }
+          const response = await axiosInstance.get(`/api/ingredients?branch=${branchId}`);
           const formattedIngredients: Ingredient[] = response.data.map((item: any) => ({
             id: item._id,
             name: item.name,
@@ -133,15 +138,19 @@ export function AddMenuItemDialog({
 
   const onSubmit = async (data: FormValues) => {
      try {
+       const branchId = getBranchId();
+       if (!branchId) {
+         throw new Error("Branch ID not found. Please log in again.");
+       }
        const payload = {
         menuItems: [{
             ...data,
             price: Number(data.price),
-            recipe: data.recipe.map(r => ({ ...r, qtyRequired: Number(r.qtyRequired) }))
+            recipe: data.recipe.map(r => ({ ...r, qtyRequired: Number(r.qtyRequired) })),
         }]
        };
 
-      await axiosInstance.post(`/api/menu`, payload);
+      await axiosInstance.post(`/api/menu?branch=${branchId}`, payload);
       onMenuItemAdded();
       setIsOpen(false);
       reset();

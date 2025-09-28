@@ -17,6 +17,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 interface CreateOrderDialogProps {
   children: React.ReactNode;
@@ -52,7 +53,11 @@ export function CreateOrderDialog({
         setLoadingMenu(true);
         setMenuError(null);
         try {
-          const response = await axiosInstance.get(`/api/menu`);
+          const branchId = getBranchId();
+          if (!branchId) {
+            throw new Error("Branch ID not found. Please log in again.");
+          }
+          const response = await axiosInstance.get(`/api/menu?branch=${branchId}`);
           if (response.data && Array.isArray(response.data)) {
             const formattedMenuItems: MenuItem[] = response.data.map((item: any) => ({
               id: item._id,
@@ -75,9 +80,9 @@ export function CreateOrderDialog({
           } else {
             throw new Error("Invalid data format from API");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Failed to fetch menu:", err);
-          setMenuError("Could not load the menu. Please try again.");
+          setMenuError(err.message || "Could not load the menu. Please try again.");
         } finally {
           setLoadingMenu(false);
         }
@@ -136,6 +141,13 @@ export function CreateOrderDialog({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    const branchId = getBranchId();
+    if (!branchId) {
+        // You might want to show an error to the user here.
+        console.error("Branch ID is missing, cannot create order.");
+        setIsSubmitting(false);
+        return;
+    }
     try {
       const payload = {
         items: orderItems.map((item) => ({
@@ -150,6 +162,7 @@ export function CreateOrderDialog({
           name: customerName,
           phone: customerPhone,
         },
+        branch: branchId,
       };
 
       const res = await axiosInstance.post(

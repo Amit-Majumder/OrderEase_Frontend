@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 const CUSTOMER_PHONE_KEY = 'customerPhoneNumber';
 const CUSTOMER_NAME_KEY = 'customerName';
@@ -96,6 +97,12 @@ export default function CartPage() {
     setIsSubmitting(true);
     saveCustomerDetails();
 
+    // The customer-facing menu doesn't have a branch context,
+    // so we assume there's a single default branch or the backend handles it.
+    // If multiple branches were selectable by customers, this would need adjustment.
+    // For now, let's retrieve it if available, but not block if it's not.
+    const branchId = getBranchId() || '68d692389c2bedfcd6250c6c'; // Fallback for customer flow
+
     try {
        const payload = {
         items: cart.map(item => ({
@@ -110,6 +117,7 @@ export default function CartPage() {
           name: customerName,
           phone: customerPhone,
         },
+        branch: branchId,
       };
 
       const res = await axiosInstance.post(

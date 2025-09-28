@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
+import { cn, getBranchId } from '@/lib/utils';
 import { useOrder } from '@/context/OrderContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -101,6 +101,10 @@ export function EditIngredientDialog({
 
   const onSubmit = async (data: FormValues) => {
     try {
+        const branchId = getBranchId();
+        if (!branchId) {
+            throw new Error("Branch ID not found. Please log in again.");
+        }
         const payload = {
             name: data.name,
             quantity: Number(data.quantity),
@@ -109,7 +113,7 @@ export function EditIngredientDialog({
         };
 
       await axiosInstance.patch(
-        `/api/ingredients/${ingredient.id}`,
+        `/api/ingredients/${ingredient.id}?branch=${branchId}`,
         payload
       );
       onIngredientUpdated();

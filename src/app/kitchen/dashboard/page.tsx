@@ -9,6 +9,7 @@ import type { DashboardData } from '@/lib/types';
 import { OrdersSnapshot } from '@/components/dashboard/OrdersSnapshot';
 import { InventorySnapshot } from '@/components/dashboard/InventorySnapshot';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -18,8 +19,13 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
+        const branchId = getBranchId();
+        if (!branchId) {
+            throw new Error("Branch ID not found. Please log in again.");
+        }
         const response = await axiosInstance.get(
-          `/api/kitchen/dashboard-stats`
+          `/api/kitchen/dashboard-stats`,
+          { params: { branch: branchId } }
         );
         const apiData = response.data;
         
@@ -32,9 +38,9 @@ export default function DashboardPage() {
         });
 
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch dashboard data:', err);
-        setError('Could not load dashboard data. Please try again later.');
+        setError(err.message || 'Could not load dashboard data. Please try again later.');
         setLoading(false);
       }
     }

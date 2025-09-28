@@ -20,6 +20,8 @@ import {
   Table,
   User,
   Search,
+  Users,
+  Building
 } from 'lucide-react';
 import { Separator } from './ui/separator';
 import Link from 'next/link';
@@ -33,11 +35,13 @@ const menuItems = [
   { icon: BarChart, label: 'Sales Report', href: '/kitchen/sales-reports' },
   { icon: Boxes, label: 'Inventory', href: '/kitchen/inventory' },
   { icon: BookOpen, label: 'Menu Management', href: '/kitchen/menu-management' },
+  { icon: Users, label: 'Roles', href: '/kitchen/roles' },
+  { icon: Building, label: 'Branches', href: '/kitchen/branches' },
 ];
 
 const bottomMenuItems = [
   { icon: Settings, label: 'Settings', href: '#' },
-  { icon: User, label: 'Profile', href: '#' },
+  { icon: User, label: 'Profile', href: '/kitchen/profile' },
   { icon: LogOut, label: 'Logout', href: '#' },
 ];
 
@@ -70,9 +74,20 @@ export function KitchenSidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
-    router.push('/kitchen/login');
+    localStorage.removeItem('userProfile');
+    router.push('/');
     setIsOpen(false);
   };
+
+  const handleBottomMenuClick = (item: typeof bottomMenuItems[0]) => {
+      if (item.label === 'Logout') {
+        handleLogout();
+      } else if (item.href !== '#') {
+        router.push(item.href);
+        setIsOpen(false);
+      }
+      // Do nothing for '#' links for now
+  }
 
 
   return (
@@ -123,8 +138,11 @@ export function KitchenSidebar() {
                 <Button
                   key={index}
                   variant="ghost"
-                  className="justify-start text-base text-white/80 hover:bg-cyan-500/10 hover:text-cyan-300"
-                  onClick={item.label === 'Logout' ? handleLogout : () => setIsOpen(false)}
+                  className={cn(
+                    "justify-start text-base text-white/80 hover:bg-cyan-500/10 hover:text-cyan-300",
+                     pathname === item.href && 'bg-cyan-500/20 text-cyan-300'
+                  )}
+                  onClick={() => handleBottomMenuClick(item)}
                 >
                   <item.icon className="mr-4 h-5 w-5" />
                   {item.label}

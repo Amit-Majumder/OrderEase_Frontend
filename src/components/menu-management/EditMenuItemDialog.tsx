@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useOrder } from '@/context/OrderContext';
 import { ScrollArea } from '../ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { cn, getBranchId } from '@/lib/utils';
 import { axiosInstance } from '@/lib/axios-instance';
 
 interface EditMenuItemDialogProps {
@@ -101,8 +101,12 @@ export function EditMenuItemDialog({
         setDialogLoading(true);
         setDialogError(null);
         try {
+          const branchId = getBranchId();
+          if (!branchId) {
+            throw new Error("Branch ID not found.");
+          }
           // Fetch all available ingredients for the dropdown
-          const ingredientsResponse = await axiosInstance.get(`/api/ingredients`);
+          const ingredientsResponse = await axiosInstance.get(`/api/ingredients?branch=${branchId}`);
           const formattedIngredients: Ingredient[] = ingredientsResponse.data.map((item: any) => ({
             id: item._id,
             name: item.name,

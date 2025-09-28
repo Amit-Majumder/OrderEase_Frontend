@@ -12,6 +12,7 @@ import { AddMenuItemDialog } from '@/components/menu-management/AddMenuItemDialo
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrder } from '@/context/OrderContext';
 import { axiosInstance } from '@/lib/axios-instance';
+import { getBranchId } from '@/lib/utils';
 
 // Helper function to check for a valid URL
 const isValidUrl = (url: string | undefined): boolean => {
@@ -81,8 +82,12 @@ export default function MenuManagementPage() {
   const fetchMenuItems = useCallback(async () => {
     try {
       setLoading(true);
+      const branchId = getBranchId();
+      if (!branchId) {
+        throw new Error("Branch ID not found. Please log in again.");
+      }
       const response = await axiosInstance.get(
-        `/api/menu`
+        `/api/menu?branch=${branchId}`
       );
       if (response.data && Array.isArray(response.data)) {
         const formattedMenuItems: FullMenuItem[] = response.data.map(
@@ -113,9 +118,9 @@ export default function MenuManagementPage() {
       } else {
         throw new Error('Invalid data format from API');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch menu items:', err);
-      setError('Could not load the menu. Please try again later.');
+      setError(err.message || 'Could not load the menu. Please try again later.');
     } finally {
       setLoading(false);
     }

@@ -2,12 +2,16 @@
 'use client';
 
 import { OrderCard } from '@/components/OrderCard';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { useOrder } from '@/context/OrderContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CreateOrderDialog } from '@/components/CreateOrderDialog';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 export default function KitchenPage() {
-  const { kitchenOrders, loading, error } = useOrder();
+  const { kitchenOrders, loading, error, fetchKitchenOrders } = useOrder();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const newOrders = kitchenOrders
     .filter(
@@ -20,6 +24,10 @@ export default function KitchenPage() {
   const completedOrders = kitchenOrders.filter(
     (order) => order.status === 'done'
   );
+  
+  const handleOrderCreated = () => {
+    fetchKitchenOrders();
+  };
 
   if (loading) {
     return (
@@ -38,14 +46,28 @@ export default function KitchenPage() {
       )}
 
       <Tabs defaultValue="new-orders">
-        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
-          <TabsTrigger value="new-orders">
-            New Orders ({newOrders.length})
-          </TabsTrigger>
-          <TabsTrigger value="completed-orders">
-            Completed Orders ({completedOrders.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex justify-center items-center relative">
+           <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="new-orders">
+              New Orders ({newOrders.length})
+              </TabsTrigger>
+              <TabsTrigger value="completed-orders">
+              Completed Orders ({completedOrders.length})
+              </TabsTrigger>
+          </TabsList>
+          <div className="absolute right-0">
+            <CreateOrderDialog
+                isOpen={isCreateDialogOpen}
+                setIsOpen={setIsCreateDialogOpen}
+                onOrderCreated={handleOrderCreated}
+            >
+                <Button className="bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Order
+                </Button>
+            </CreateOrderDialog>
+          </div>
+        </div>
         <TabsContent value="new-orders">
           <div className="mt-6">
             {newOrders.length > 0 ? (

@@ -4,34 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="89ebbafe-e1fe-4597-a866-7f4aa879193d" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ai/flows/order-flow.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/ai/flows/order-flow.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/globals.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/kitchen/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/kitchen/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/layout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/menu/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/menu/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/my-cart/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/my-cart/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/my-orders/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/my-orders/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/order/[token]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/order/[token]/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/CreateOrderDialog.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/CreateOrderDialog.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/KitchenHeader.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/KitchenHeader.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/OrderCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/OrderCard.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/badge.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/badge.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/chart.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/chart.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/dialog.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/dialog.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/sheet.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/sheet.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/tabs.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/tabs.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/textarea.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/textarea.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/context/OrderContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/context/OrderContext.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tailwind.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tailwind.config.ts" afterDir="false" />
-    </list>
+    <list default="true" id="89ebbafe-e1fe-4597-a866-7f4aa879193d" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
